@@ -1,11 +1,12 @@
 const router = require('express').Router();
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/roleCheck');
+const asyncHandler = require('../middleware/asyncHandler');
 const controller = require('../controllers/targetController');
-router.use(authenticate);
-router.get('/', controller.listTargets);
-router.get('/:id', controller.targetDetail);
-router.post('/', requireRole('admin'), controller.createTarget);
-router.patch('/:id/progress', requireRole('member'), controller.updateProgress);
-router.patch('/:id/review', requireRole('admin'), controller.reviewTarget);
+router.use(asyncHandler(authenticate));
+router.get('/', asyncHandler(controller.listTargets));
+router.get('/:id', asyncHandler(controller.targetDetail));
+router.post('/', requireRole('admin'), asyncHandler(controller.createTarget));
+router.patch('/:id/progress', requireRole('member'), asyncHandler(controller.updateProgress));
+router.patch('/:id/review', requireRole('admin'), asyncHandler(controller.reviewTarget));
 module.exports = router;

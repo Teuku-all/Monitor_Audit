@@ -1,94 +1,81 @@
 const { db } = require('../config/db');
 
-function addComment(req, res) {
+async function addComment(req, res) {
   const { submission_id } = req.params;
   const body = typeof req.body.body === 'string' ? req.body.body.trim() : '';
-
-  if (!body || !body.trim()) {
-    return res.status(400).json({ message: 'Isi komentar tidak boleh kosong.' });
-  }
+  if (!body) return res.status(400).json({ message: 'Isi komentar tidak boleh kosong.' });
   if (body.length > 4000) return res.status(400).json({ message: 'Komentar maksimal 4000 karakter.' });
 
-  const submission = db.prepare('SELECT id FROM submissions WHERE id = ?').get(submission_id);
-  if (!submission) {
-    return res.status(404).json({ message: 'Submission tidak ditemukan.' });
-  }
-
-  const result = db.prepare(`
-    INSERT INTO comments (submission_id, admin_id, body) VALUES (?, ?, ?)
-  `).run(submission_id, req.user.id, body.trim());
-
-  res.status(201).json({ message: 'Komentar berhasil ditambahkan.', id: result.lastInsertRowid });
+  const { rows: submissions } = await db.query('SELECT id FROM submissions WHERE id = $1', [submission_id]);
+  if (!submissions[0]) return res.status(404).json({ message: 'Submission tidak ditemukan.' });
+  const { rows } = await db.query(
+    'INSERT INTO comments (submission_id, admin_id, body) VALUES ($1, $2, $3) RETURNING id',
+    [submission_id, req.user.id, body],
+  );
+  res.status(201).json({ message: 'Komentar berhasil ditambahkan.', id: rows[0].id });
 }
 
-function getComments(req, res) {
+async function getComments(req, res) {
   const { submission_id } = req.params;
-  const submission = db.prepare('SELECT id, member_id FROM submissions WHERE id = ?').get(submission_id);
-  if (!submission) {
-    return res.status(404).json({ message: 'Submission tidak ditemukan.' });
-  }
+  const { rows } = await db.query('SELECT id, member_id FROM submissions WHERE id = $1', [submission_id]);
+  const submission = rows[0];
+  if (!submission) return res.status(404).json({ message: 'Submission tidak ditemukan.' });
   if (req.user.role === 'member' && submission.member_id !== req.user.id) {
     return res.status(403).json({ message: 'Akses ditolak.' });
   }
-
-  res.json(getCommentsForSubmission(submission_id));
+  res.json(await getCommentsForSubmission(submission_id));
 }
 
-function getCommentsForSubmission(submissionId) {
-  const comments = db.prepare(`
-    SELECT c.*, u.name as admin_name
+async function getCommentsForSubmission(submissionId) {
+  const { rows: comments } = await db.query(`
+    SELECT c.*, u.name AS admin_name
     FROM comments c
     JOIN users u ON c.admin_id = u.id
-    WHERE c.submission_id = ?
+    WHERE c.submission_id = $1
     ORDER BY c.created_at ASC
-  `).all(submissionId);
-
+  `, [submissionId]);
   if (!comments.length) return comments;
 
   const commentIds = comments.map(comment => comment.id);
-  const placeholders = commentIds.map(() => '?').join(', ');
-  const replies = db.prepare(`
-    SELECT r.*, u.name as author_name
+  const placeholders = commentIds.map((_, index) => `$${index + 1}`).join(', ');
+  const { rows: replies } = await db.query(`
+    SELECT r.*, u.name AS author_name
     FROM comment_replies r
     JOIN users u ON r.user_id = u.id
     WHERE r.comment_id IN (${placeholders})
     ORDER BY r.created_at ASC, r.id ASC
-  `).all(...commentIds);
-
+  `, commentIds);
   const repliesByComment = new Map(commentIds.map(id => [id, []]));
   for (const reply of replies) repliesByComment.get(reply.comment_id).push(reply);
   return comments.map(comment => ({ ...comment, replies: repliesByComment.get(comment.id) }));
 }
 
-function addReply(req, res) {
+async function addReply(req, res) {
   const { submission_id, comment_id } = req.params;
   const body = typeof req.body.body === 'string' ? req.body.body.trim() : '';
-
   if (!body) return res.status(400).json({ message: 'Isi balasan tidak boleh kosong.' });
   if (body.length > 2000) return res.status(400).json({ message: 'Balasan maksimal 2000 karakter.' });
 
-  const comment = db.prepare(`
+  const { rows: comments } = await db.query(`
     SELECT c.id, s.member_id
     FROM comments c
     JOIN submissions s ON s.id = c.submission_id
-    WHERE c.id = ? AND c.submission_id = ?
-  `).get(comment_id, submission_id);
-
+    WHERE c.id = $1 AND c.submission_id = $2
+  `, [comment_id, submission_id]);
+  const comment = comments[0];
   if (!comment) return res.status(404).json({ message: 'Komentar tidak ditemukan.' });
   if (comment.member_id !== req.user.id) return res.status(403).json({ message: 'Akses ditolak.' });
 
-  const result = db.prepare(`
-    INSERT INTO comment_replies (comment_id, user_id, body) VALUES (?, ?, ?)
-  `).run(comment_id, req.user.id, body);
-
-  const reply = db.prepare(`
-    SELECT r.*, u.name as author_name
+  const { rows } = await db.query(`
+    INSERT INTO comment_replies (comment_id, user_id, body) VALUES ($1, $2, $3) RETURNING id
+  `, [comment_id, req.user.id, body]);
+  const { rows: replyRows } = await db.query(`
+    SELECT r.*, u.name AS author_name
     FROM comment_replies r
     JOIN users u ON r.user_id = u.id
-    WHERE r.id = ?
-  `).get(result.lastInsertRowid);
-
-  res.status(201).json({ message: 'Balasan berhasil dikirim.', reply });
+    WHERE r.id = $1
+  `, [rows[0].id]);
+  res.status(201).json({ message: 'Balasan berhasil dikirim.', reply: replyRows[0] });
 }
 
 module.exports = { addComment, addReply, getComments, getCommentsForSubmission };

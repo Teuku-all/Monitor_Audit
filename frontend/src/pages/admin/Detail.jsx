@@ -6,7 +6,6 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
 
 const STATUSES = ['Menunggu', 'Disetujui', 'Perlu Revisi'];
-const UPLOADS_URL = (import.meta.env.VITE_UPLOADS_URL || 'http://localhost:3001/uploads').replace(/\/$/, '');
 
 export default function AdminDetail() {
   const { id } = useParams();
@@ -83,7 +82,7 @@ export default function AdminDetail() {
             <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold text-[#052659]">{t('Detail dokumen', 'Document details')}</h2><StatusBadge status={data.status}/></div>
             <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-slate-600">{data.description || t('Tidak ada deskripsi tambahan.', 'No additional description.')}</p>
             {data.target_id && <p className="mt-4 text-xs font-medium text-[#052659]">{t('Terkait target', 'Linked to target')} #{data.target_id}</p>}
-            <a href={`${UPLOADS_URL}/${encodeURIComponent(data.file_path)}`} target="_blank" rel="noreferrer" className="mt-5 flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-[#C2E8FF] hover:bg-[#C2E8FF]/20">
+            <a href={data.file_path} target="_blank" rel="noreferrer" className="mt-5 flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-[#C2E8FF] hover:bg-[#C2E8FF]/20">
               <span aria-hidden="true" className="flex h-11 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-[#052659]"><svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M14 3H6v18h12V7l-4-4Z"/><path d="M14 3v5h5M9 12h6M9 16h4"/></svg></span>
               <span className="min-w-0 flex-1"><span className="block break-all text-sm font-medium text-[#052659]">{data.file_name}</span><span className="mt-1 block text-xs text-slate-500">{t('Buka lampiran di tab baru', 'Open attachment in a new tab')}</span></span><span aria-hidden="true" className="text-[#052659]">↗</span>
             </a>

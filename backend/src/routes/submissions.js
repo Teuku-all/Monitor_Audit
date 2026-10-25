@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth');
 const { requireRole } = require('../middleware/roleCheck');
+const asyncHandler = require('../middleware/asyncHandler');
 const upload = require('../middleware/upload');
 const {
   getAllSubmissions,
@@ -13,15 +14,15 @@ const {
 } = require('../controllers/submissionController');
 
 // Admin
-router.get('/', authenticate, requireRole('admin'), getAllSubmissions);
-router.get('/stats', authenticate, requireRole('admin'), getStats);
-router.patch('/:id/status', authenticate, requireRole('admin'), updateStatus);
+router.get('/', asyncHandler(authenticate), requireRole('admin'), asyncHandler(getAllSubmissions));
+router.get('/stats', asyncHandler(authenticate), requireRole('admin'), asyncHandler(getStats));
+router.patch('/:id/status', asyncHandler(authenticate), requireRole('admin'), asyncHandler(updateStatus));
 
 // Member
-router.get('/mine', authenticate, requireRole('member'), getMySubmissions);
-router.post('/', authenticate, requireRole('member'), upload.single('file'), createSubmission);
+router.get('/mine', asyncHandler(authenticate), requireRole('member'), asyncHandler(getMySubmissions));
+router.post('/', asyncHandler(authenticate), requireRole('member'), upload.single('file'), asyncHandler(createSubmission));
 
 // Both roles
-router.get('/:id', authenticate, getSubmissionById);
+router.get('/:id', asyncHandler(authenticate), asyncHandler(getSubmissionById));
 
 module.exports = router;

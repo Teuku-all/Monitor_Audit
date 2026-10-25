@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -24,7 +25,7 @@ function RootRedirect() {
 function Workspace() { return <Layout />; }
 
 export default function App() {
-  return <LanguageProvider><AuthProvider><BrowserRouter><Routes>
+  const app = <LanguageProvider><AuthProvider><BrowserRouter><Routes>
     <Route path="/" element={<RootRedirect />} />
     <Route path="/login" element={<Login />} />
     <Route path="/register" element={<Register />} />
@@ -46,4 +47,6 @@ export default function App() {
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes></BrowserRouter></AuthProvider></LanguageProvider>;
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  return googleClientId ? <GoogleOAuthProvider clientId={googleClientId}>{app}</GoogleOAuthProvider> : app;
 }

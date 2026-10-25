@@ -1,11 +1,11 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
+  baseURL: import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3001/api' : '/api'),
   timeout: 30000,
 });
 
-const isPublicAuth = (url = '') => /\/auth\/(login|register)\/?$/.test(url);
+const isPublicAuth = (url = '') => /\/auth\/(login|register|google)\/?$/.test(url);
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
