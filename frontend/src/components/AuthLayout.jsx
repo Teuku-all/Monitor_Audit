@@ -1,9 +1,11 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import BrandMark from './BrandMark';
+import ThemeToggle from './ThemeToggle';
 
 export default function AuthLayout({ children }) {
   const { language, setLanguage, t } = useLanguage();
+  const { pathname } = useLocation();
   return (
     <main className="auth-layout flex min-h-screen items-center justify-center bg-[#FFFFFF] p-4 sm:p-8">
       <div className="grid w-full max-w-[1120px] overflow-hidden rounded-[28px] border border-white bg-white shadow-[0_24px_80px_rgba(5,38,89,0.1)] lg:min-h-[720px] lg:grid-cols-[0.95fr_1.05fr]">
@@ -27,12 +29,15 @@ export default function AuthLayout({ children }) {
         <section className="auth-form-panel flex flex-col px-6 py-6 sm:px-10 lg:px-14">
           <div className="mb-7 flex items-center justify-between gap-3 lg:justify-end">
             <Link to="/login" className="flex items-center gap-2 text-sm font-semibold text-[#052659] lg:hidden"><BrandMark size={36}/><span>Audit Monitor</span></Link>
-            <div className="flex items-center gap-1 rounded-full bg-slate-100 p-1" aria-label={t('Pilih bahasa', 'Choose language')}>
-              <button type="button" onClick={() => setLanguage('id')} aria-pressed={language === 'id'} aria-label="Bahasa Indonesia" className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${language === 'id' ? 'bg-white text-[#052659] shadow-sm' : 'text-slate-500 hover:text-[#052659]'}`}>ID</button>
-              <button type="button" onClick={() => setLanguage('en')} aria-pressed={language === 'en'} aria-label="English" className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${language === 'en' ? 'bg-white text-[#052659] shadow-sm' : 'text-slate-500 hover:text-[#052659]'}`}>EN</button>
+            <div className="auth-header-controls">
+              <ThemeToggle />
+              <div className="flex items-center gap-1 rounded-full bg-slate-100 p-1" aria-label={t('Pilih bahasa', 'Choose language')}>
+                <button type="button" onClick={() => setLanguage('id')} aria-pressed={language === 'id'} aria-label="Bahasa Indonesia" className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${language === 'id' ? 'bg-white text-[#052659] shadow-sm' : 'text-slate-500 hover:text-[#052659]'}`}>ID</button>
+                <button type="button" onClick={() => setLanguage('en')} aria-pressed={language === 'en'} aria-label="English" className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${language === 'en' ? 'bg-white text-[#052659] shadow-sm' : 'text-slate-500 hover:text-[#052659]'}`}>EN</button>
+              </div>
             </div>
           </div>
-          <div className="mx-auto flex w-full max-w-[390px] flex-1 flex-col justify-center py-5">{children}</div>
+          <div key={pathname} className="auth-route-transition mx-auto flex w-full max-w-[390px] flex-1 flex-col justify-center py-5">{children}</div>
           <p className="mt-7 text-center text-[11px] text-slate-400">Audit Monitor &middot; {t('Ruang kerja audit yang terorganisir', 'Your organized audit workspace')}</p>
         </section>
       </div>

@@ -70,10 +70,11 @@ export default function AdminDetail() {
 
   if (loading) return <div role="status" className="panel p-10 text-center text-sm text-slate-500">{t('Memuat dokumen...', 'Loading document...')}</div>;
   if (loadError || !data) return <div className="panel p-8"><h1 className="text-lg font-semibold text-[#052659]">{t('Dokumen belum dapat ditampilkan', 'Unable to display this document')}</h1><p role="alert" className="mt-2 text-sm text-slate-500">{t('Periksa koneksi atau pastikan dokumen masih tersedia.', 'Check your connection or make sure the document is still available.')}</p><div className="mt-5 flex flex-wrap gap-3"><button className="btn-primary" onClick={() => setAttempt(value => value + 1)}>{t('Coba lagi', 'Try again')}</button><Link className="btn-secondary" to="/admin">{t('Ke dasbor', 'Back to dashboard')}</Link></div></div>;
+  const conversationCount = (data.comments || []).reduce((total, item) => total + 1 + (item.replies?.length || 0), 0);
 
   return (
     <div className="space-y-6">
-      <Link to="/admin" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#052659]"><span aria-hidden="true">&larr;</span>{t('Kembali ke dasbor', 'Back to dashboard')}</Link>
+      <Link to="/admin" className="back-link"><span aria-hidden="true">&larr;</span>{t('Kembali ke dasbor', 'Back to dashboard')}</Link>
       <div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#052659]">{t('Peninjauan dokumen', 'Document review')}</p><h1 className="page-title break-words">{data.title}</h1><p className="page-subtitle">{t('Dikirim oleh', 'Submitted by')} {data.member_name} &middot; {formatDate(data.submitted_at, { dateStyle: 'long' })}</p></div>
       {notice && <div role={notice.endsWith('Error') ? 'alert' : 'status'} className={`alert ${notice.endsWith('Error') ? 'alert-error' : 'border border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{messages[notice]}</div>}
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
@@ -88,10 +89,11 @@ export default function AdminDetail() {
             </a>
           </section>
           <section className="panel p-5 sm:p-6">
-            <div className="flex items-center justify-between gap-3"><h2 className="font-semibold text-[#052659]">{t('Diskusi & umpan balik', 'Discussion & feedback')}</h2><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">{data.comments?.length || 0}</span></div>
-            <p className="mt-2 text-xs leading-5 text-slate-500">{t('Berikan arahan yang jelas. Anggota dapat membalas setiap komentar Anda.', 'Give clear guidance. Members can reply to each of your comments.')}</p>
+            <div className="flex items-center justify-between gap-3"><h2 className="font-semibold text-[#052659]">{t('Percakapan dokumen', 'Document conversation')}</h2><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">{conversationCount} {t('pesan','messages')}</span></div>
+            <div className="conversation-route"><span className="conversation-route-label">{t('Penerima','Recipient')}</span><strong>{data.member_name}</strong><span className="conversation-route-separator" aria-hidden="true">·</span><span>{t('Terkait dokumen ini','Attached to this document')}</span></div>
+            <p className="mt-2 text-xs leading-5 text-slate-500">{t(`Pesan yang Anda kirim akan muncul di halaman dokumen ini pada ruang kerja ${data.member_name}. Anggota dapat membalas setiap pesan.`, `Messages you send appear on this document in ${data.member_name}’s workspace. The member can reply to each message.`)}</p>
             <div className="my-6 space-y-5">
-              {!data.comments?.length ? <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center"><p className="text-sm text-slate-500">{t('Belum ada diskusi untuk dokumen ini.', 'No discussion on this document yet.')}</p><p className="mt-1 text-xs text-slate-400">{t('Mulai dengan menambahkan komentar di bawah.', 'Start by adding a comment below.')}</p></div> : data.comments.map(item => (
+              {!data.comments?.length ? <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center"><p className="text-sm text-slate-500">{t('Belum ada pesan pada dokumen ini.', 'No messages on this document yet.')}</p><p className="mt-1 text-xs text-slate-400">{t('Tulis pesan di bawah untuk menghubungi anggota.', 'Write a message below to contact the member.')}</p></div> : data.comments.map(item => (
                 <article key={item.id} className="rounded-2xl border border-slate-200 p-4 sm:p-5">
                   <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex min-w-0 items-center gap-2.5"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#C2E8FF]/60 text-xs font-semibold text-[#052659]">{item.admin_name?.charAt(0).toUpperCase()}</span><span className="break-words text-sm font-semibold text-[#052659]">{item.admin_name}<span className="ml-2 text-[10px] font-normal text-slate-500">{t('Admin', 'Admin')}</span></span></div><time className="text-[11px] text-slate-400">{formatDate(item.created_at, { dateStyle: 'medium', timeStyle: 'short' })}</time></div>
                   <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600">{item.body}</p>
@@ -100,9 +102,9 @@ export default function AdminDetail() {
               ))}
             </div>
             <form onSubmit={handleComment} className="border-t border-slate-100 pt-5">
-              <label className="label" htmlFor="admin-comment">{t('Tambahkan komentar', 'Add a comment')}</label>
-              <textarea id="admin-comment" className="input min-h-[110px] resize-y" placeholder={t('Tulis arahan, pertanyaan, atau catatan revisi...', 'Write guidance, a question, or a revision note...')} value={comment} onChange={event => setComment(event.target.value)} maxLength={4000} rows={3} required disabled={submitting}/>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><span className="text-[11px] text-slate-400">{comment.length}/4000</span><button type="submit" className="btn-primary" disabled={submitting || !comment.trim()}>{submitting ? t('Mengirim...', 'Sending...') : t('Kirim komentar', 'Send comment')}<span aria-hidden="true">&rarr;</span></button></div>
+              <label className="label" htmlFor="admin-comment">{t(`Kirim pesan ke ${data.member_name}`, `Send a message to ${data.member_name}`)}</label>
+              <textarea id="admin-comment" className="input min-h-[110px] resize-y" placeholder={t('Tulis arahan atau pertanyaan tentang dokumen ini...', 'Write guidance or a question about this document...')} value={comment} onChange={event => setComment(event.target.value)} maxLength={4000} rows={3} required disabled={submitting}/>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><span className="text-[11px] text-slate-400">{comment.length}/4000</span><button type="submit" className="btn-primary" disabled={submitting || !comment.trim()}>{submitting ? t('Mengirim...', 'Sending...') : t('Kirim ke anggota', 'Send to member')}<span aria-hidden="true">&rarr;</span></button></div>
             </form>
           </section>
         </div>

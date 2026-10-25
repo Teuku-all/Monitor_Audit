@@ -4,17 +4,17 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: '#FFFFFF', surface: '#FFFFFF', border: '#C2E8FF', accent: '#052659', 'accent-hover': '#052659',
-        slate: { 50: 'rgba(194,232,255,.12)', 100: 'rgba(194,232,255,.22)', 200: 'rgba(194,232,255,.4)', 300: 'rgba(194,232,255,.65)', 400: 'rgba(5,38,89,.48)', 500: 'rgba(5,38,89,.62)', 600: 'rgba(5,38,89,.76)', 700: 'rgba(5,38,89,.86)', 800: '#052659', 900: '#052659' },
-        gray: { 400: 'rgba(5,38,89,.48)', 500: 'rgba(5,38,89,.62)' },
-        emerald: { 50: 'rgba(194,232,255,.25)', 100: 'rgba(194,232,255,.4)', 200: 'rgba(194,232,255,.7)', 700: '#052659', 800: '#052659', 900: '#052659' },
-        rose: { 600: '#052659' },
+        bg: '#F8FAFC', surface: '#FFFFFF', border: '#E2E8F0', accent: '#2563EB', 'accent-hover': '#1D4ED8',
+        slate: { 50: '#F8FAFC', 100: '#F1F5F9', 200: '#E2E8F0', 300: '#CBD5E1', 400: '#94A3B8', 500: '#64748B', 600: '#475569', 700: '#334155', 800: '#1E293B', 900: '#0F172A' },
+        gray: { 400: '#94A3B8', 500: '#64748B' },
+        emerald: { 50: '#ECFDF5', 100: '#D1FAE5', 200: '#A7F3D0', 700: '#047857', 800: '#065F46', 900: '#064E3B' },
+        rose: { 600: '#E11D48' },
       },
       fontFamily: { sans: ['Inter', 'sans-serif'] },
-      ringColor: { DEFAULT: '#052659' },
+      ringColor: { DEFAULT: '#2563EB' },
       boxShadow: {
-        sm: '0 1px 2px 0 rgb(5 38 89 / .05)',
-        lg: '0 10px 15px -3px rgb(5 38 89 / .1), 0 4px 6px -4px rgb(5 38 89 / .1)',
+        sm: '0 1px 2px 0 rgb(15 23 42 / .05)',
+        lg: '0 10px 15px -3px rgb(15 23 42 / .1), 0 4px 6px -4px rgb(15 23 42 / .1)',
       },
     },
   },
