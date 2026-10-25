@@ -13,10 +13,10 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="border-b border-white/[0.07] bg-[#011025]/90 backdrop-blur-xl sticky top-0 z-50">
+    <nav className="border-b border-white/[0.07] bg-[#052659]/90 backdrop-blur-xl sticky top-0 z-50">
       <div className="max-w-[1180px] mx-auto px-6 h-[72px] flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-[#5482B4] to-[#052659] rounded-[14px] flex items-center justify-center shadow-lg shadow-[#011025]/60">
+          <div className="w-10 h-10 bg-gradient-to-br from-[#052659] to-[#052659] rounded-[14px] flex items-center justify-center shadow-lg shadow-[#052659]/60">
             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -36,7 +36,7 @@ export default function Navbar() {
             Dashboard
           </button>
           <div className="hidden sm:block h-8 w-px bg-white/10" />
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#5482B4]/25 to-[#052659]/15 border border-[#7EA0C5]/20 flex items-center justify-center text-[#C2E8FF] font-semibold text-sm">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#052659]/25 to-[#052659]/15 border border-[#C2E8FF]/20 flex items-center justify-center text-[#C2E8FF] font-semibold text-sm">
             {user?.name?.trim()?.charAt(0).toUpperCase() || '?'}
           </div>
           <div className="text-left hidden md:block min-w-28">

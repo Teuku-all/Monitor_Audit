@@ -1,185 +1,116 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import Navbar from '../../components/Navbar';
+import { Link, useParams } from 'react-router-dom';
 import StatusBadge from '../../components/StatusBadge';
+import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
 
 const STATUSES = ['Menunggu', 'Disetujui', 'Perlu Revisi'];
-const UPLOADS_URL = import.meta.env.VITE_UPLOADS_URL || 'http://localhost:3001/uploads';
+const UPLOADS_URL = (import.meta.env.VITE_UPLOADS_URL || 'http://localhost:3001/uploads').replace(/\/$/, '');
 
 export default function AdminDetail() {
   const { id } = useParams();
-  const navigate = useNavigate();
+  const { t, formatDate } = useLanguage();
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [comment, setComment] = useState('');
-  const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
+  const [attempt, setAttempt] = useState(0);
+  const [loadError, setLoadError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [savingStatus, setSavingStatus] = useState('');
+  const [notice, setNotice] = useState('');
+  const messages = {
+    status: t('Status dokumen berhasil diperbarui.', 'Document status updated.'),
+    comment: t('Komentar terkirim. Anggota dapat membalasnya di ruang kerja mereka.', 'Comment sent. The member can reply from their workspace.'),
+    statusError: t('Status belum dapat diperbarui. Silakan coba lagi.', 'Unable to update the status. Please try again.'),
+    commentError: t('Komentar belum terkirim. Tulisan Anda tetap tersimpan di form.', 'Your comment was not sent. Your draft is still in the form.'),
+  };
 
-  useEffect(() => { fetchDetail(); }, [id]);
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setLoadError(false);
+    setNotice('');
+    api.get(`/submissions/${id}`, { signal: controller.signal })
+      .then(response => setData(response.data))
+      .catch(() => { if (!controller.signal.aborted) setLoadError(true); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [id, attempt]);
 
-  async function fetchDetail() {
+  async function handleStatusChange(status) {
+    if (savingStatus || status === data.status) return;
+    setSavingStatus(status);
+    setNotice('');
     try {
-      const res = await api.get(`/submissions/${id}`);
-      setData(res.data);
-      setStatus(res.data.status);
-    } catch { navigate('/admin'); }
-    finally { setLoading(false); }
+      await api.patch(`/submissions/${id}/status`, { status });
+      setData(current => ({ ...current, status }));
+      setNotice('status');
+    } catch { setNotice('statusError'); }
+    finally { setSavingStatus(''); }
   }
 
-  async function handleStatusChange(newStatus) {
-    setStatus(newStatus);
-    try {
-      await api.patch(`/submissions/${id}/status`, { status: newStatus });
-      setMsg('Status berhasil diperbarui.');
-      fetchDetail();
-    } catch (err) {
-      setMsg(err.response?.data?.message || 'Gagal memperbarui status.');
-    }
-  }
-
-  async function handleComment(e) {
-    e.preventDefault();
-    if (!comment.trim()) return;
+  async function handleComment(event) {
+    event.preventDefault();
+    const body = comment.trim();
+    if (!body || submitting) return;
     setSubmitting(true);
+    setNotice('');
     try {
-      await api.post(`/comments/${id}`, { body: comment });
+      const response = await api.post(`/comments/${id}`, { body });
+      setData(current => ({ ...current, comments: [...(current.comments || []), {
+        id: response.data.id, body, admin_name: user.name, created_at: new Date().toISOString(), replies: [],
+      }] }));
       setComment('');
-      setMsg('Komentar berhasil ditambahkan.');
-      fetchDetail();
-    } catch (err) {
-      setMsg(err.response?.data?.message || 'Gagal mengirim komentar.');
-    } finally { setSubmitting(false); }
+      setNotice('comment');
+    } catch { setNotice('commentError'); }
+    finally { setSubmitting(false); }
   }
 
-  if (loading) return <div className="min-h-screen bg-bg flex items-center justify-center text-gray-500">Memuat...</div>;
+  if (loading) return <div role="status" className="panel p-10 text-center text-sm text-slate-500">{t('Memuat dokumen...', 'Loading document...')}</div>;
+  if (loadError || !data) return <div className="panel p-8"><h1 className="text-lg font-semibold text-[#052659]">{t('Dokumen belum dapat ditampilkan', 'Unable to display this document')}</h1><p role="alert" className="mt-2 text-sm text-slate-500">{t('Periksa koneksi atau pastikan dokumen masih tersedia.', 'Check your connection or make sure the document is still available.')}</p><div className="mt-5 flex flex-wrap gap-3"><button className="btn-primary" onClick={() => setAttempt(value => value + 1)}>{t('Coba lagi', 'Try again')}</button><Link className="btn-secondary" to="/admin">{t('Ke dasbor', 'Back to dashboard')}</Link></div></div>;
 
   return (
-    <div className="min-h-screen bg-bg">
-      <Navbar />
-      <main className="page-container max-w-[1050px]">
-        <button onClick={() => navigate('/admin')} className="back-link">
-          ← Kembali ke Dashboard
-        </button>
-
-        {msg && (
-          <div className="mb-4 p-3 bg-accent/10 border border-accent/30 rounded-lg text-accent text-sm">
-            {msg}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main info */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="card">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h1 className="text-xl font-bold text-white">{data.title}</h1>
-                  <p className="text-gray-500 text-sm mt-1">
-                    Oleh {data.member_name} • {new Date(data.submitted_at).toLocaleDateString('id-ID', { dateStyle: 'long' })}
-                  </p>
-                </div>
-                <StatusBadge status={data.status} />
-              </div>
-              {data.description && (
-                <p className="text-gray-400 text-sm leading-relaxed">{data.description}</p>
-              )}
-              <div className="mt-4 pt-4 border-t border-border">
-                <p className="text-xs text-gray-500 mb-2">Dokumen Terlampir</p>
-                <a
-                  href={`${UPLOADS_URL}/${data.file_path}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 text-accent hover:text-accent-hover text-sm font-medium transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  {data.file_name}
-                </a>
-              </div>
+    <div className="space-y-6">
+      <Link to="/admin" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#052659]"><span aria-hidden="true">&larr;</span>{t('Kembali ke dasbor', 'Back to dashboard')}</Link>
+      <div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#052659]">{t('Peninjauan dokumen', 'Document review')}</p><h1 className="page-title break-words">{data.title}</h1><p className="page-subtitle">{t('Dikirim oleh', 'Submitted by')} {data.member_name} &middot; {formatDate(data.submitted_at, { dateStyle: 'long' })}</p></div>
+      {notice && <div role={notice.endsWith('Error') ? 'alert' : 'status'} className={`alert ${notice.endsWith('Error') ? 'alert-error' : 'border border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{messages[notice]}</div>}
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="min-w-0 space-y-6">
+          <section className="panel p-5 sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold text-[#052659]">{t('Detail dokumen', 'Document details')}</h2><StatusBadge status={data.status}/></div>
+            <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-slate-600">{data.description || t('Tidak ada deskripsi tambahan.', 'No additional description.')}</p>
+            {data.target_id && <p className="mt-4 text-xs font-medium text-[#052659]">{t('Terkait target', 'Linked to target')} #{data.target_id}</p>}
+            <a href={`${UPLOADS_URL}/${encodeURIComponent(data.file_path)}`} target="_blank" rel="noreferrer" className="mt-5 flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-[#C2E8FF] hover:bg-[#C2E8FF]/20">
+              <span aria-hidden="true" className="flex h-11 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-[#052659]"><svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M14 3H6v18h12V7l-4-4Z"/><path d="M14 3v5h5M9 12h6M9 16h4"/></svg></span>
+              <span className="min-w-0 flex-1"><span className="block break-all text-sm font-medium text-[#052659]">{data.file_name}</span><span className="mt-1 block text-xs text-slate-500">{t('Buka lampiran di tab baru', 'Open attachment in a new tab')}</span></span><span aria-hidden="true" className="text-[#052659]">↗</span>
+            </a>
+          </section>
+          <section className="panel p-5 sm:p-6">
+            <div className="flex items-center justify-between gap-3"><h2 className="font-semibold text-[#052659]">{t('Diskusi & umpan balik', 'Discussion & feedback')}</h2><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">{data.comments?.length || 0}</span></div>
+            <p className="mt-2 text-xs leading-5 text-slate-500">{t('Berikan arahan yang jelas. Anggota dapat membalas setiap komentar Anda.', 'Give clear guidance. Members can reply to each of your comments.')}</p>
+            <div className="my-6 space-y-5">
+              {!data.comments?.length ? <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center"><p className="text-sm text-slate-500">{t('Belum ada diskusi untuk dokumen ini.', 'No discussion on this document yet.')}</p><p className="mt-1 text-xs text-slate-400">{t('Mulai dengan menambahkan komentar di bawah.', 'Start by adding a comment below.')}</p></div> : data.comments.map(item => (
+                <article key={item.id} className="rounded-2xl border border-slate-200 p-4 sm:p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex min-w-0 items-center gap-2.5"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#C2E8FF]/60 text-xs font-semibold text-[#052659]">{item.admin_name?.charAt(0).toUpperCase()}</span><span className="break-words text-sm font-semibold text-[#052659]">{item.admin_name}<span className="ml-2 text-[10px] font-normal text-slate-500">{t('Admin', 'Admin')}</span></span></div><time className="text-[11px] text-slate-400">{formatDate(item.created_at, { dateStyle: 'medium', timeStyle: 'short' })}</time></div>
+                  <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600">{item.body}</p>
+                  {!!item.replies?.length && <div className="mt-4 space-y-3 border-l-2 border-[#C2E8FF] pl-4">{item.replies.map(reply => <div key={reply.id} className="rounded-xl bg-slate-50 p-3 sm:p-4"><div className="flex flex-wrap justify-between gap-2"><span className="break-words text-xs font-semibold text-[#052659]">{reply.author_name}<span className="ml-2 font-normal text-slate-400">{t('Anggota', 'Member')}</span></span><time className="text-[10px] text-slate-400">{formatDate(reply.created_at, { dateStyle: 'medium', timeStyle: 'short' })}</time></div><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600">{reply.body}</p></div>)}</div>}
+                </article>
+              ))}
             </div>
-
-            {/* Comments */}
-            <div className="card">
-              <h2 className="font-semibold text-white mb-4">Komentar Admin</h2>
-              <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
-                {data.comments?.length === 0 ? (
-                  <p className="text-gray-600 text-sm">Belum ada komentar.</p>
-                ) : data.comments?.map((c) => (
-                  <div key={c.id} className="rounded-xl border border-border bg-bg p-4">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-accent text-sm font-medium">{c.admin_name}</span>
-                      <span className="text-gray-600 text-xs">
-                        {new Date(c.created_at).toLocaleDateString('id-ID')}
-                      </span>
-                    </div>
-                    <p className="text-gray-200 text-sm leading-relaxed">{c.body}</p>
-                    {c.replies?.length > 0 && (
-                      <div className="mt-3 space-y-2 border-l border-[#5482B4]/40 pl-3">
-                        {c.replies.map(reply => (
-                          <div key={reply.id} className="rounded-lg border border-white/[0.06] bg-white/[0.025] p-3">
-                            <div className="mb-1 flex items-center justify-between gap-3">
-                              <span className="text-xs font-semibold text-[#C2E8FF]">{reply.author_name} <span className="ml-1 font-normal text-gray-500">Member</span></span>
-                              <span className="text-[10px] text-gray-600">{new Date(reply.created_at).toLocaleDateString('id-ID')}</span>
-                            </div>
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-300">{reply.body}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <form onSubmit={handleComment} className="flex gap-2">
-                <input
-                  type="text"
-                  className="input flex-1"
-                  placeholder="Tulis komentar..."
-                  value={comment}
-                  onChange={e => setComment(e.target.value)}
-                />
-                <button type="submit" className="btn-primary" disabled={submitting}>
-                  {submitting ? '...' : 'Kirim'}
-                </button>
-              </form>
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            <div className="card">
-              <h3 className="font-semibold text-white mb-4">Ubah Status</h3>
-              <div className="space-y-2">
-                {STATUSES.map(s => (
-                  <button
-                    key={s}
-                    onClick={() => handleStatusChange(s)}
-                    className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors border ${
-                      status === s
-                        ? 'bg-accent/10 border-accent text-accent'
-                        : 'bg-bg border-border text-gray-400 hover:border-accent/50'
-                    }`}
-                  >
-                    {s === 'Menunggu' && '🕐 '}{s === 'Disetujui' && '✅ '}{s === 'Perlu Revisi' && '🔄 '}{s}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="card">
-              <h3 className="font-semibold text-white mb-3">Info Member</h3>
-              <div className="space-y-2 text-sm">
-                <p className="text-gray-500">Nama</p>
-                <p className="text-white font-medium">{data.member_name}</p>
-                <p className="text-gray-500 mt-2">Email</p>
-                <p className="text-white">{data.member_email}</p>
-              </div>
-            </div>
-          </div>
+            <form onSubmit={handleComment} className="border-t border-slate-100 pt-5">
+              <label className="label" htmlFor="admin-comment">{t('Tambahkan komentar', 'Add a comment')}</label>
+              <textarea id="admin-comment" className="input min-h-[110px] resize-y" placeholder={t('Tulis arahan, pertanyaan, atau catatan revisi...', 'Write guidance, a question, or a revision note...')} value={comment} onChange={event => setComment(event.target.value)} maxLength={4000} rows={3} required disabled={submitting}/>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><span className="text-[11px] text-slate-400">{comment.length}/4000</span><button type="submit" className="btn-primary" disabled={submitting || !comment.trim()}>{submitting ? t('Mengirim...', 'Sending...') : t('Kirim komentar', 'Send comment')}<span aria-hidden="true">&rarr;</span></button></div>
+            </form>
+          </section>
         </div>
-      </main>
+        <aside className="space-y-6">
+          <section className="panel p-5 sm:p-6"><h2 className="font-semibold text-[#052659]">{t('Status peninjauan', 'Review status')}</h2><p className="mt-2 text-xs leading-5 text-slate-500">{t('Pilih hasil peninjauan dokumen ini.', 'Select the outcome of your document review.')}</p><div className="mt-5 space-y-2">{STATUSES.map(status => <button key={status} type="button" onClick={() => handleStatusChange(status)} aria-pressed={data.status === status} disabled={Boolean(savingStatus)} className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm transition-colors disabled:opacity-60 ${data.status === status ? 'border-[#052659] bg-[#C2E8FF]/25 font-semibold text-[#052659]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}><span>{status === 'Menunggu' ? t('Menunggu tinjauan', 'Awaiting review') : status === 'Disetujui' ? t('Disetujui', 'Approved') : t('Perlu revisi', 'Revision needed')}</span><span aria-hidden="true">{savingStatus === status ? '…' : data.status === status ? '✓' : ''}</span></button>)}</div></section>
+          <section className="panel p-5 sm:p-6"><h2 className="font-semibold text-[#052659]">{t('Pemilik dokumen', 'Document owner')}</h2><div className="mt-5 flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#052659] text-sm font-semibold text-white">{data.member_name?.charAt(0).toUpperCase()}</span><div className="min-w-0"><p className="break-words text-sm font-semibold text-[#052659]">{data.member_name}</p><p className="mt-1 text-xs text-slate-500">{t('Anggota tim', 'Team member')}</p></div></div><p className="mt-4 break-all text-xs text-slate-500">{data.member_email}</p></section>
+        </aside>
+      </div>
     </div>
   );
 }

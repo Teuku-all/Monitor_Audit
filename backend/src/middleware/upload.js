@@ -2,7 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-const uploadDir = path.join(__dirname, '../../uploads');
+const uploadDir = process.env.UPLOAD_DIR ? path.resolve(__dirname, '../..', process.env.UPLOAD_DIR) : path.join(__dirname, '../../uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({
@@ -20,7 +20,9 @@ const fileFilter = (req, file, cb) => {
   if (allowed.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new Error('Format file tidak didukung. Gunakan PDF, Word, Excel, atau gambar.'));
+    const error = new Error('Format file tidak didukung. Gunakan PDF, Word, Excel, atau gambar.');
+    error.status = 400;
+    cb(error);
   }
 };
 

@@ -1,112 +1,55 @@
-# 🔍 Audit Monitor Platform
+# Audit Monitor
 
-Platform monitoring kinerja audit tim dengan dua peran: **Admin** dan **Member**.
+Audit Monitor is a bilingual (Indonesian and English) workspace for audit teams. Admins review submissions, discuss comments with members, assign work targets, and track progress. Members register an account, update assigned work, and submit documents for review.
 
----
+## Run locally
 
-## 🚀 Cara Menjalankan
+Requirements: Node.js 20+ and npm.
 
-### Prasyarat
-- Node.js v22+
-- npm
+1. Copy `backend/.env.example` to `backend/.env` and set a long, random `JWT_SECRET`. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` if you want to choose the initial administrator credentials.
+2. In `backend/`, run `npm install` and then `npm run dev`.
+3. Copy `frontend/.env.example` to `frontend/.env` if needed. Set `VITE_API_URL=http://localhost:3001/api` and `VITE_UPLOADS_URL=http://localhost:3001/uploads`.
+4. In `frontend/`, run `npm install` and `npm run dev`, then open `http://localhost:5173`.
 
----
+The SQLite database is created at `backend/src/config/database.db` by default. Existing accounts and submissions are retained when the additive target migration runs. Uploaded files are stored under `backend/uploads/` by default.
 
-### 1. Backend
+For a fresh local database in development, the default administrator is `admin@audit.com` with password `admin123`. Change these credentials before deploying. In production, set both `ADMIN_EMAIL` and `ADMIN_PASSWORD`; the development password is not seeded in production.
 
-```bash
-cd backend
-npm install
-npm run dev
-```
+Members can register from the sign-in page. Admin accounts are provisioned through the backend environment and should not be created through public registration.
 
-Server berjalan di: `http://localhost:3001`
+## Work target lifecycle
 
-**Akun Admin default:**
-- Email: `admin@audit.com`
-- Password: `admin123`
+Admins assign a target to one registered member with instructions, priority, and a due date. The assigned member updates progress and notes; at 100%, the target is submitted for review. Admins can complete it or request a revision with feedback. Members can attach audit documents to a target and see linked submissions and discussion.
 
----
+## API overview
 
-### 2. Frontend
+| Method | Endpoint | Access | Purpose |
+| --- | --- | --- | --- |
+| POST | `/api/auth/register` | Public | Register a member account |
+| POST | `/api/auth/login` | Public | Sign in and receive a JWT |
+| GET | `/api/auth/profile` | Signed in | Verify current account |
+| GET | `/api/users` | Admin | List members and workload counts |
+| GET/POST | `/api/targets` | Signed in / Admin for POST | List targets / assign a target |
+| GET | `/api/targets/:id` | Admin or assigned member | View a target and its documents |
+| PATCH | `/api/targets/:id/progress` | Assigned member | Update work progress and notes |
+| PATCH | `/api/targets/:id/review` | Admin | Complete a target or request a revision |
+| GET | `/api/submissions` | Admin | List submitted documents |
+| GET | `/api/submissions/mine` | Member | List own documents |
+| POST | `/api/submissions` | Member | Upload a document, optionally linked to a target |
+| GET | `/api/submissions/:id` | Admin or document owner | View document and discussion |
+| PATCH | `/api/submissions/:id/status` | Admin | Update document review status |
+| POST | `/api/comments/:submission_id` | Admin | Comment on a document |
+| POST | `/api/comments/:submission_id/:comment_id/replies` | Document owner | Reply to an admin comment |
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+## Stack
 
-App berjalan di: `http://localhost:5173`
+- Frontend: React 18, Vite, Tailwind CSS
+- Backend: Node.js, Express
+- Database: SQLite (`better-sqlite3`)
+- Authentication: JWT
+- Document uploads: Multer
 
----
+## Checks
 
-## 📁 Struktur Project
-
-```
-audit-monitor/
-├── backend/
-│   ├── src/
-│   │   ├── config/db.js          ← SQLite init & seed
-│   │   ├── middleware/
-│   │   │   ├── auth.js           ← JWT verify
-│   │   │   ├── roleCheck.js      ← Guard by role
-│   │   │   └── upload.js         ← Multer config
-│   │   ├── controllers/          ← Business logic
-│   │   └── routes/               ← Express routes
-│   ├── uploads/                  ← File dokumen tersimpan
-│   ├── .env
-│   └── server.js
-│
-└── frontend/
-    └── src/
-        ├── api/axios.js           ← Axios + interceptor
-        ├── context/AuthContext    ← Global auth state
-        ├── components/            ← Navbar, Badge, Guard
-        └── pages/
-            ├── Login.jsx
-            ├── admin/             ← Dashboard + Detail
-            └── member/            ← Dashboard + Upload + Detail
-```
-
----
-
-## 🔌 API Endpoints
-
-| Method | Endpoint | Role | Deskripsi |
-|--------|----------|------|-----------|
-| POST | `/api/auth/register` | Public | Daftar akun |
-| POST | `/api/auth/login` | Public | Login, dapat JWT |
-| GET | `/api/auth/profile` | Both | Profil user |
-| GET | `/api/submissions` | Admin | Semua submission |
-| GET | `/api/submissions/stats` | Admin | Statistik ringkas |
-| GET | `/api/submissions/mine` | Member | Submission sendiri |
-| GET | `/api/submissions/:id` | Both | Detail submission |
-| POST | `/api/submissions` | Member | Upload submission |
-| PATCH | `/api/submissions/:id/status` | Admin | Ubah status |
-| POST | `/api/comments/:submission_id` | Admin | Tambah komentar |
-| POST | `/api/comments/:submission_id/:comment_id/replies` | Member pemilik submission | Balas komentar admin |
-| GET | `/api/comments/:submission_id` | Both | Lihat komentar |
-
----
-
-## 🎨 Tech Stack
-
-| Layer | Tech |
-|-------|------|
-| Frontend | React 18, Vite, Tailwind CSS |
-| Backend | Node.js, Express.js |
-| Database | SQLite (better-sqlite3) |
-| Auth | JWT (jsonwebtoken) |
-| Upload | Multer |
-
----
-
-## 🌐 Mendaftarkan Akun Member
-
-Karena belum ada halaman register di UI, gunakan endpoint langsung:
-
-```bash
-curl -X POST http://localhost:3001/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Budi Santoso","email":"budi@email.com","password":"password123","role":"member"}'
-```
+- Frontend production build: `cd frontend && npm run build`
+- Backend integration tests: `cd backend && npm test`

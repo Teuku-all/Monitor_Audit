@@ -2,11 +2,12 @@ const { db } = require('../config/db');
 
 function addComment(req, res) {
   const { submission_id } = req.params;
-  const { body } = req.body;
+  const body = typeof req.body.body === 'string' ? req.body.body.trim() : '';
 
   if (!body || !body.trim()) {
     return res.status(400).json({ message: 'Isi komentar tidak boleh kosong.' });
   }
+  if (body.length > 4000) return res.status(400).json({ message: 'Komentar maksimal 4000 karakter.' });
 
   const submission = db.prepare('SELECT id FROM submissions WHERE id = ?').get(submission_id);
   if (!submission) {

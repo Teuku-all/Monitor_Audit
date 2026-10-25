@@ -1,168 +1,19 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Navbar from '../../components/Navbar';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../api/axios';
-
-export default function MemberUpload() {
-  const navigate = useNavigate();
-  const [form, setForm] = useState({ title: '', description: '' });
-  const [file, setFile] = useState(null);
-  const [dragOver, setDragOver] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  function handleFile(f) {
-    if (!f) return;
-    const allowed = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg'];
-    const ext = '.' + f.name.split('.').pop().toLowerCase();
-    if (!allowed.includes(ext)) {
-      setError('Format file tidak didukung. Gunakan PDF, Word, Excel, atau gambar.');
-      return;
-    }
-    if (f.size > 10 * 1024 * 1024) {
-      setError('Ukuran file maksimal 10 MB.');
-      return;
-    }
-    setError('');
-    setFile(f);
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setError('');
-    if (!file) { setError('Pilih file untuk diunggah.'); return; }
-
-    setLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append('title', form.title);
-      formData.append('description', form.description);
-      formData.append('file', file);
-
-      await api.post('/submissions', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      setSuccess('Submission berhasil dikirim! Mengarahkan ke dashboard...');
-      setTimeout(() => navigate('/member'), 2000);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Gagal mengunggah submission.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="min-h-screen bg-bg">
-      <Navbar />
-      <main className="page-container max-w-[760px]">
-        <button onClick={() => navigate('/member')} className="back-link">
-          ← Kembali ke Dashboard
-        </button>
-
-        <div className="page-heading">
-          <span className="eyebrow">Pengiriman dokumen</span>
-          <h1>Upload dokumen audit</h1>
-          <p>Unggah dokumen audit Anda agar dapat direview admin.</p>
-        </div>
-
-        {success && (
-          <div className="mb-4 p-4 bg-green-500/10 border border-green-500/30 rounded-xl text-green-400 text-sm">
-            ✅ {success}
-          </div>
-        )}
-        {error && (
-          <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="card space-y-5">
-          <div>
-            <label className="label">Judul Submission *</label>
-            <input
-              type="text"
-              className="input"
-              placeholder="Contoh: Laporan Audit Q3 2024"
-              value={form.title}
-              onChange={e => setForm({ ...form, title: e.target.value })}
-              required
-            />
-          </div>
-
-          <div>
-            <label className="label">Deskripsi</label>
-            <textarea
-              className="input min-h-[100px] resize-none"
-              placeholder="Tambahkan catatan atau deskripsi singkat..."
-              value={form.description}
-              onChange={e => setForm({ ...form, description: e.target.value })}
-            />
-          </div>
-
-          <div>
-            <label className="label">File Dokumen *</label>
-            <div
-              role="button"
-              tabIndex={0}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById('fileInput').click(); } }}
-              className={`border-2 border-dashed rounded-2xl p-8 sm:p-10 text-center transition-all cursor-pointer ${
-                dragOver ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50'
-              }`}
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
-              onClick={() => document.getElementById('fileInput').click()}
-            >
-              {file ? (
-                <div>
-                  <div className="w-12 h-12 bg-accent/10 border border-accent/30 rounded-xl flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <p className="text-white font-medium">{file.name}</p>
-                  <p className="text-gray-500 text-xs mt-1">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                    className="mt-2 text-xs text-red-400 hover:text-red-300"
-                  >
-                    Hapus file
-                  </button>
-                </div>
-              ) : (
-                <div>
-                  <div className="w-12 h-12 bg-surface border border-border rounded-xl flex items-center justify-center mx-auto mb-3">
-                    <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                  </div>
-                  <p className="text-gray-400 font-medium">Drag & drop atau klik untuk pilih file</p>
-                  <p className="text-gray-600 text-xs mt-1">PDF, Word, Excel, atau gambar — Maks. 10 MB</p>
-                </div>
-              )}
-            </div>
-            <input
-              id="fileInput"
-              type="file"
-              className="hidden"
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-              onChange={e => handleFile(e.target.files[0])}
-            />
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={() => navigate('/member')} className="btn-secondary flex-1">
-              Batal
-            </button>
-            <button type="submit" className="btn-primary flex-1" disabled={loading}>
-              {loading ? 'Mengunggah...' : 'Upload Submission'}
-            </button>
-          </div>
-        </form>
-      </main>
-    </div>
-  );
+import { useLanguage } from '../../context/LanguageContext';
+import { ErrorState, LoadingState } from '../../components/States';
+import Icon from '../../components/Icon';
+export default function MemberUpload(){
+ const {t}=useLanguage();const navigate=useNavigate();const [params]=useSearchParams();const targetId=params.get('target');
+ const [target,setTarget]=useState(null);const [targetLoading,setTargetLoading]=useState(Boolean(targetId));const [form,setForm]=useState({title:'',description:''});const [file,setFile]=useState(null);const [drag,setDrag]=useState(false);const [saving,setSaving]=useState(false);const [error,setError]=useState('');
+ useEffect(()=>{if(!targetId)return;const c=new AbortController();api.get(`/targets/${targetId}`,{signal:c.signal}).then(({data})=>setTarget(data)).catch(()=>{if(!c.signal.aborted)setError(t('Target tidak ditemukan atau Anda tidak memiliki akses.','Target not found or you do not have access.'))}).finally(()=>{if(!c.signal.aborted)setTargetLoading(false)});return()=>c.abort()},[targetId]);
+ function selectFile(f){if(!f)return;const allowed=['.pdf','.doc','.docx','.xls','.xlsx','.png','.jpg','.jpeg'];const ext='.'+f.name.split('.').pop().toLowerCase();if(!allowed.includes(ext)){setError(t('Format file tidak didukung. Gunakan PDF, Word, Excel, atau gambar.','Unsupported file type. Use PDF, Word, Excel, or an image.'));return}if(f.size>10*1024*1024){setError(t('Ukuran file maksimal 10 MB.','Maximum file size is 10 MB.'));return}setError('');setFile(f)}
+ async function submit(e){e.preventDefault();if(!file){setError(t('Pilih file untuk diunggah.','Choose a file to upload.'));return}setSaving(true);setError('');try{const body=new FormData();body.append('title',form.title);body.append('description',form.description);body.append('file',file);if(targetId)body.append('target_id',targetId);await api.post('/submissions',body,{headers:{'Content-Type':'multipart/form-data'}});navigate(targetId?`/member/targets/${targetId}`:'/member/submissions')}catch(e){setError(e.response?.data?.message||t('Dokumen belum dapat diunggah.','Could not upload the document.'))}finally{setSaving(false)}}
+ return <div className="workspace-page upload-page"><Link to={targetId?`/member/targets/${targetId}`:'/member'} className="back-link"><span>←</span>{targetId?t('Kembali ke target','Back to target'):t('Kembali ke ringkasan','Back to overview')}</Link><div className="page-heading"><div><span className="eyebrow">{t('Pengiriman dokumen','Document submission')}</span><h1>{t('Kirim dokumen audit','Submit an audit document')}</h1><p>{t('Unggah dokumen agar admin dapat meninjau pekerjaan Anda.','Upload a document for your administrator to review.')}</p></div></div>
+ {error&&<div className="alert alert-error" role="alert">{error}</div>}{targetLoading?<LoadingState/>:targetId&&target&&<div className="linked-target"><Icon name="target" size={18}/><span><small>{t('Dokumen terkait target','Document linked to target')}</small><strong>{target.title}</strong></span><Link to={`/member/targets/${targetId}`}>{t('Buka','Open')}</Link></div>}
+ <form onSubmit={submit} className="panel upload-form"><div><label className="label" htmlFor="upload-title">{t('Judul dokumen','Document title')} *</label><input id="upload-title" className="input" required maxLength="200" value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder={t('Contoh: Laporan audit Q3','Example: Q3 audit report')}/></div><div><label className="label" htmlFor="upload-description">{t('Deskripsi','Description')}</label><textarea id="upload-description" className="input" rows="3" maxLength="5000" value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder={t('Tambahkan konteks atau catatan untuk admin...','Add context or a note for your administrator...')}/></div>
+ <div><label className="label" htmlFor="upload-file">{t('File dokumen','Document file')} *</label><label htmlFor="upload-file" className={`upload-drop ${drag?'dragging':''}`} onDragOver={e=>{e.preventDefault();setDrag(true)}} onDragLeave={()=>setDrag(false)} onDrop={e=>{e.preventDefault();setDrag(false);selectFile(e.dataTransfer.files[0])}}><Icon name={file?'check':'upload'} size={25}/><strong>{file?file.name:t('Tarik file ke sini atau pilih dari perangkat','Drop a file here or browse your device')}</strong><small>{file?`${(file.size/1024/1024).toFixed(2)} MB`:t('PDF, Word, Excel, atau gambar · Maks. 10 MB','PDF, Word, Excel, or image · Max 10 MB')}</small><input id="upload-file" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" onChange={e=>selectFile(e.target.files[0])}/></label></div>
+ <div className="form-actions"><Link className="btn-secondary" to={targetId?`/member/targets/${targetId}`:'/member'}>{t('Batal','Cancel')}</Link><button className="btn-primary" type="submit" disabled={saving||targetLoading||Boolean(targetId&&!target)}>{saving?t('Mengunggah...','Uploading...'):t('Kirim untuk ditinjau','Submit for review')}<Icon name="arrow" size={15}/></button></div></form>
+ </div>
 }

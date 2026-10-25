@@ -1,0 +1,39 @@
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import api from '../api/axios';
+import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
+import StatusBadge from '../components/StatusBadge';
+import { Priority, ProgressBar } from '../components/TargetTable';
+import { ErrorState, LoadingState } from '../components/States';
+import Icon from '../components/Icon';
+
+export default function TargetDetail() {
+  const { id } = useParams(); const { user } = useAuth(); const { t, formatDate } = useLanguage();
+  const admin = user?.role === 'admin'; const base = admin ? '/admin' : '/member';
+  const [data, setData] = useState(null); const [loading, setLoading] = useState(true); const [failed, setFailed] = useState(false); const [attempt, setAttempt] = useState(0);
+  const [progress, setProgress] = useState(0); const [note, setNote] = useState(''); const [feedback, setFeedback] = useState('');
+  const [saving, setSaving] = useState(false); const [notice, setNotice] = useState(''); const [error, setError] = useState('');
+  useEffect(() => { const c = new AbortController(); setLoading(true); setFailed(false); api.get(`/targets/${id}`, { signal: c.signal }).then(({data:d}) => { setData(d); setProgress(d.progress || 0); setNote(d.note || ''); setFeedback(d.feedback || ''); }).catch(() => { if (!c.signal.aborted) setFailed(true); }).finally(() => { if (!c.signal.aborted) setLoading(false); }); return () => c.abort(); }, [id, attempt]);
+  async function updateProgress(e) { e.preventDefault(); setSaving(true); setError(''); setNotice(''); try { const {data:d}=await api.patch(`/targets/${id}/progress`, {progress:Number(progress),note}); setData(d); setNotice(d.status === 'submitted' ? 'submitted' : 'saved'); } catch(e) { setError(e.response?.data?.message || t('Progres belum tersimpan.','Progress could not be saved.')); } finally {setSaving(false);} }
+  async function review(status) { setSaving(true); setError(''); setNotice(''); try { const {data:d}=await api.patch(`/targets/${id}/review`, {status,feedback}); setData(d); setNotice(status); } catch(e) { setError(e.response?.data?.message || t('Hasil tinjauan belum tersimpan.','Review could not be saved.')); } finally {setSaving(false);} }
+  if (loading) return <LoadingState/>;
+  if (failed || !data) return <div className="workspace-page"><ErrorState onRetry={() => setAttempt(x=>x+1)}/><Link className="btn-secondary" to={`${base}/targets`}>{t('Kembali ke target','Back to targets')}</Link></div>;
+  const editable = !admin && !['submitted','completed'].includes(data.status);
+  return <div className="workspace-page"><Link to={`${base}/targets`} className="back-link"><span>←</span>{t('Semua target','All targets')}</Link>
+    <div className="page-heading"><div><span className="eyebrow">{t('Target kerja','Work target')} #{String(data.id).padStart(3,'0')}</span><h1>{data.title}</h1><p>{t('Dibuat oleh','Assigned by')} {data.created_by_name}</p></div><StatusBadge status={data.status}/></div>
+    {notice && <div role="status" className="alert alert-success">{notice==='saved'?t('Progres berhasil disimpan.','Progress saved.'):notice==='submitted'?t('Target dikirim untuk ditinjau admin.','Target submitted for admin review.'):notice==='revision'?t('Target dikembalikan untuk revisi.','Target returned for revision.'):t('Target disetujui dan selesai.','Target approved and completed.')}</div>}{error&&<div role="alert" className="alert alert-error">{error}</div>}
+    <div className="target-detail-grid"><section className="panel detail-content"><h2>{t('Arahan pekerjaan','Work instructions')}</h2><p className="detail-description">{data.description || t('Tidak ada arahan tambahan. Hubungi admin jika ada yang perlu diperjelas.','No additional instructions. Contact the admin if you need clarification.')}</p><dl className="detail-meta"><div><dt>{t('Ditugaskan ke','Assigned to')}</dt><dd>{data.assigned_name}</dd></div><div><dt>{t('Tenggat','Due date')}</dt><dd>{formatDate(data.due_date,{day:'numeric',month:'long',year:'numeric'})}</dd></div><div><dt>{t('Prioritas','Priority')}</dt><dd><Priority value={data.priority}/></dd></div><div><dt>{t('Terakhir diperbarui','Last updated')}</dt><dd>{formatDate(data.updated_at,{dateStyle:'medium'})}</dd></div></dl>
+      <h2>{t('Progres saat ini','Current progress')}</h2><div className="detail-progress"><strong>{data.progress}%</strong><ProgressBar value={data.progress}/></div>
+      {data.note && <div className="target-note"><strong>{t('Catatan progres dari anggota','Member progress note')}</strong><p>{data.note}</p></div>}
+      {data.feedback && <div className="target-feedback"><strong>{t('Umpan balik admin','Admin feedback')}</strong><p>{data.feedback}</p></div>}
+      </section><aside className="detail-stack">
+        {editable && <section className="panel detail-content"><h2>{t('Perbarui progres','Update progress')}</h2><form onSubmit={updateProgress}><label className="label" htmlFor="progress">{t('Persentase selesai','Percent complete')}</label><div className="detail-progress"><strong>{progress}%</strong><span>{progress===100?t('Siap dikirim','Ready to submit'):t('Dalam pengerjaan','In progress')}</span></div><input id="progress" className="range-input" type="range" min="0" max="100" step="5" value={progress} onChange={e=>setProgress(Number(e.target.value))}/><label className="label" htmlFor="progress-note">{t('Catatan untuk admin','Note for admin')}</label><textarea id="progress-note" className="input" rows="4" maxLength="4000" value={note} onChange={e=>setNote(e.target.value)} placeholder={t('Ceritakan progres atau kendala pekerjaan...','Share your progress or any blockers...')}/><button className="btn-primary mt-4 w-full" disabled={saving}>{saving?t('Menyimpan...','Saving...'):progress===100?t('Kirim untuk ditinjau','Submit for review'):t('Simpan progres','Save progress')}</button></form></section>}
+        {admin && data.status==='submitted' && <section className="panel detail-content"><h2>{t('Tinjau target','Review target')}</h2><label className="label" htmlFor="feedback">{t('Umpan balik','Feedback')}</label><textarea id="feedback" className="input" rows="4" maxLength="4000" value={feedback} onChange={e=>setFeedback(e.target.value)} placeholder={t('Wajib diisi jika meminta revisi','Required when requesting changes')}/><div className="mt-4 grid gap-2"><button className="btn-primary" disabled={saving} onClick={()=>review('completed')}>{t('Setujui & selesaikan','Approve & complete')}</button><button className="btn-secondary" disabled={saving||!feedback.trim()} onClick={()=>review('revision')}>{t('Minta revisi','Request revision')}</button></div></section>}
+        {!admin && data.status==='submitted' && <section className="panel detail-content"><h2>{t('Menunggu tinjauan','Awaiting review')}</h2><p className="field-hint">{t('Admin akan meninjau progres dan memberikan umpan balik di sini.','The admin will review your progress and leave feedback here.')}</p></section>}
+        {data.submissions?.length>0 && <section className="panel detail-content"><h2>{t('Dokumen terkait','Related documents')}</h2><div className="related-list">{data.submissions.map(s=><Link key={s.id} to={`${base}/submissions/${s.id}`}><Icon name="file" size={16}/><span>{s.title}<small>{formatDate(s.submitted_at)}</small></span><StatusBadge status={s.status}/></Link>)}</div></section>}
+        {!admin && <Link className="btn-secondary" to={`/member/upload?target=${data.id}`}><Icon name="upload" size={16}/>{t('Kirim dokumen untuk target','Upload a document for this target')}</Link>}
+        {admin && <Link className="btn-secondary" to={`${base}/submissions`}>{t('Lihat semua dokumen','View all documents')}</Link>}
+      </aside></div>
+  </div>;
+}

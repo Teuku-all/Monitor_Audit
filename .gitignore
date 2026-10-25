@@ -8,6 +8,8 @@
 
 # Local database and uploaded audit documents
 backend/src/config/*.db
+backend/src/config/*.db-shm
+backend/src/config/*.db-wal
 backend/uploads/*
 !backend/uploads/.gitkeep
 

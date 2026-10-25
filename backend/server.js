@@ -1,37 +1,45 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
-
 const { initDB } = require('./src/config/db');
-const authRoutes = require('./src/routes/auth');
-const submissionRoutes = require('./src/routes/submissions');
-const commentRoutes = require('./src/routes/comments');
 
+if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is required. Copy backend/.env.example to backend/.env and set a secret.');
 const app = express();
-const PORT = process.env.PORT || 3001;
-
-// Middleware
-app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Static files (uploaded documents)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Initialize DB
+app.disable('x-powered-by');
+const origins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173').split(',').map(value => value.trim()).filter(Boolean);
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || origins.includes(origin)) return callback(null, true);
+    const error = new Error('Origin tidak diizinkan.'); error.status = 403; callback(error);
+  },
+  credentials: true,
+}));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use('/uploads', express.static(process.env.UPLOAD_DIR ? path.resolve(__dirname, process.env.UPLOAD_DIR) : path.join(__dirname, 'uploads')));
 initDB();
-
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/submissions', submissionRoutes);
-app.use('/api/comments', commentRoutes);
-
-// Health check
-app.get('/', (req, res) => {
-  res.json({ status: 'Audit Monitor API running', version: '1.0.0' });
+app.use('/api/auth', require('./src/routes/auth'));
+app.use('/api/submissions', require('./src/routes/submissions'));
+app.use('/api/comments', require('./src/routes/comments'));
+app.use('/api/targets', require('./src/routes/targets'));
+app.use('/api/users', require('./src/routes/users'));
+app.get('/', (req, res) => res.json({ status: 'Audit Monitor API running', version: '1.1.0' }));
+app.use('/api', (req, res) => res.status(404).json({ code: 'NOT_FOUND', message: 'Endpoint tidak ditemukan.' }));
+app.use((error, req, res, next) => {
+  if (res.headersSent) return next(error);
+  const status = error.code === 'LIMIT_FILE_SIZE' ? 413 : error.status || 500;
+  if (status === 500) console.error(error.message);
+  res.status(status).json({
+    code: error.code || 'REQUEST_FAILED',
+    message: error.code === 'LIMIT_FILE_SIZE' ? 'Ukuran file maksimal 10 MB.' : status < 500 ? error.message : 'Terjadi kesalahan. Silakan coba lagi.',
+  });
 });
-
-app.listen(PORT, () => {
-  console.log(`✅ Server running at http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  const server = app.listen(Number(process.env.PORT || 3001), () => {
+    console.log(`Server running at http://localhost:${server.address().port}`);
+    if (process.send) process.send({ port: server.address().port });
+  });
+  process.on('SIGTERM', () => server.close(() => process.exit(0)));
+}
+module.exports = { app };

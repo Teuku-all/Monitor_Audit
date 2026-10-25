@@ -1,5 +1,11 @@
 const { db } = require('../config/db');
 const { getCommentsForSubmission } = require('./commentController');
+const { normalizeFilename } = require('../utils/normalizeFilename');
+const fs = require('fs');
+
+function normalizeSubmission(submission) {
+  return { ...submission, file_name: normalizeFilename(submission.file_name) };
+}
 
 // Admin: get all submissions
 function getAllSubmissions(req, res) {
@@ -25,7 +31,7 @@ function getAllSubmissions(req, res) {
   if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
   query += ' ORDER BY s.submitted_at DESC';
 
-  const submissions = db.prepare(query).all(...params);
+  const submissions = db.prepare(query).all(...params).map(normalizeSubmission);
   res.json(submissions);
 }
 
@@ -33,7 +39,7 @@ function getAllSubmissions(req, res) {
 function getMySubmissions(req, res) {
   const submissions = db.prepare(`
     SELECT * FROM submissions WHERE member_id = ? ORDER BY submitted_at DESC
-  `).all(req.user.id);
+  `).all(req.user.id).map(normalizeSubmission);
   res.json(submissions);
 }
 
@@ -57,20 +63,34 @@ function getSubmissionById(req, res) {
   // Get comments
   const comments = getCommentsForSubmission(id);
 
-  res.json({ ...submission, comments });
+  res.json({ ...normalizeSubmission(submission), comments });
 }
 
 // Member: create submission
 function createSubmission(req, res) {
-  const { title, description } = req.body;
-
-  if (!title) return res.status(400).json({ message: 'Judul submission wajib diisi.' });
+  const title = typeof req.body.title === 'string' ? req.body.title.trim() : '';
+  const description = typeof req.body.description === 'string' ? req.body.description.trim() : '';
+  function reject(status, message) {
+    if (req.file) fs.rmSync(req.file.path, { force: true });
+    return res.status(status).json({ message });
+  }
+  if (!title || title.length > 200 || description.length > 5000) return reject(400, 'Judul wajib diisi (maksimal 200 karakter), deskripsi maksimal 5000 karakter.');
   if (!req.file) return res.status(400).json({ message: 'File dokumen wajib diunggah.' });
 
+  let targetId = null;
+  if (req.body.target_id !== undefined && req.body.target_id !== '') {
+    targetId = Number(req.body.target_id);
+    if (!Number.isInteger(targetId)) return reject(400, 'Target tidak valid.');
+    const target = db.prepare('SELECT assigned_to, status FROM targets WHERE id = ?').get(targetId);
+    if (!target) return reject(404, 'Target tidak ditemukan.');
+    if (target.assigned_to !== req.user.id) return reject(403, 'Akses ditolak.');
+    if (target.status === 'completed') return reject(409, 'Target sudah selesai.');
+  }
+
   const result = db.prepare(`
-    INSERT INTO submissions (member_id, title, description, file_path, file_name)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(req.user.id, title, description || '', req.file.filename, req.file.originalname);
+    INSERT INTO submissions (member_id, title, description, file_path, file_name, target_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(req.user.id, title, description, req.file.filename, normalizeFilename(req.file.originalname), targetId);
 
   res.status(201).json({ message: 'Submission berhasil diunggah.', id: result.lastInsertRowid });
 }
@@ -100,7 +120,18 @@ function getStats(req, res) {
   const perluRevisi = db.prepare("SELECT COUNT(*) as count FROM submissions WHERE status = 'Perlu Revisi'").get().count;
   const totalMembers = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'member'").get().count;
 
-  res.json({ total, menunggu, disetujui, perluRevisi, totalMembers });
+  const targetTotal = db.prepare('SELECT COUNT(*) AS count FROM targets').get().count;
+  const targetCompleted = db.prepare("SELECT COUNT(*) AS count FROM targets WHERE status = 'completed'").get().count;
+  const targetPendingReview = db.prepare("SELECT COUNT(*) AS count FROM targets WHERE status = 'submitted'").get().count;
+  const now = new Date();
+  const monthly = Array.from({ length: 12 }, (_, index) => {
+    const month = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 11 + index, 1)).toISOString().slice(0, 7);
+    const counts = db.prepare(`SELECT COUNT(*) AS submitted,
+      COALESCE(SUM(CASE WHEN status = 'Disetujui' THEN 1 ELSE 0 END), 0) AS approved
+      FROM submissions WHERE strftime('%Y-%m', submitted_at) = ?`).get(month);
+    return { month, ...counts };
+  });
+  res.json({ total, menunggu, disetujui, perluRevisi, totalMembers, targetTotal, targetCompleted, targetPendingReview, monthly });
 }
 
 module.exports = {

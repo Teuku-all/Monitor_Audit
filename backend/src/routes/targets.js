@@ -1,0 +1,11 @@
+const router = require('express').Router();
+const { authenticate } = require('../middleware/auth');
+const { requireRole } = require('../middleware/roleCheck');
+const controller = require('../controllers/targetController');
+router.use(authenticate);
+router.get('/', controller.listTargets);
+router.get('/:id', controller.targetDetail);
+router.post('/', requireRole('admin'), controller.createTarget);
+router.patch('/:id/progress', requireRole('member'), controller.updateProgress);
+router.patch('/:id/review', requireRole('admin'), controller.reviewTarget);
+module.exports = router;

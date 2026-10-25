@@ -1,159 +1,26 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Navbar from '../../components/Navbar';
-import StatusBadge from '../../components/StatusBadge';
+﻿import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../api/axios';
-
-const STATUSES = ['Semua', 'Menunggu', 'Disetujui', 'Perlu Revisi'];
-
+import { useLanguage } from '../../context/LanguageContext';
+import Icon from '../../components/Icon';
+import TargetTable from '../../components/TargetTable';
+import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 export default function AdminDashboard() {
-  const navigate = useNavigate();
-  const [submissions, setSubmissions] = useState([]);
-  const [stats, setStats] = useState({});
-  const [filter, setFilter] = useState('Semua');
-  const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    fetchData();
-  }, [filter, search]);
-
-  async function fetchData() {
-    setLoading(true);
-    setError('');
-    try {
-      const params = {};
-      if (filter !== 'Semua') params.status = filter;
-      if (search) params.search = search;
-
-      const [subRes, statRes] = await Promise.all([
-        api.get('/submissions', { params }),
-        api.get('/submissions/stats'),
-      ]);
-      setSubmissions(subRes.data);
-      setStats(statRes.data);
-    } catch (err) {
-      console.error(err);
-      setError('Data belum dapat dimuat. Pastikan backend berjalan, lalu coba lagi.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const statCards = [
-    { label: 'Total Submission', value: stats.total ?? 0, color: 'text-accent' },
-    { label: 'Menunggu Review', value: stats.menunggu ?? 0, color: 'text-yellow-400' },
-    { label: 'Disetujui', value: stats.disetujui ?? 0, color: 'text-green-400' },
-    { label: 'Perlu Revisi', value: stats.perluRevisi ?? 0, color: 'text-red-400' },
-    { label: 'Total Member', value: stats.totalMembers ?? 0, color: 'text-blue-400' },
-  ];
-
-  return (
-    <div className="min-h-screen bg-bg">
-      <Navbar />
-      <main className="page-container">
-        <div className="page-heading flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <span className="eyebrow">Ringkasan workspace</span>
-            <h1>Dashboard admin</h1>
-            <p>Pantau pengiriman dan tindak lanjuti review audit tim.</p>
-          </div>
-          <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[#7EA0C5]/15 bg-[#7EA0C5]/[0.06] px-3 py-2 text-xs text-[#C2E8FF]">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 19.5A2.5 2.5 0 016.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" /></svg> Panel kontrol
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-          {statCards.map((s) => (
-            <div key={s.label} className="card stat-card">
-              <p className={`text-3xl font-bold ${s.color}`}>{s.value}</p>
-              <p>{s.label}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Filter & Search */}
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <input
-            type="text"
-            className="input sm:max-w-sm"
-            placeholder="Cari judul atau nama member..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:pb-0">
-            {STATUSES.map(s => (
-              <button
-                key={s}
-                onClick={() => setFilter(s)}
-                className={`shrink-0 px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors border ${
-                  filter === s
-                    ? 'bg-accent border-accent text-white'
-                    : 'bg-surface border-border text-gray-400 hover:border-accent/50'
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {error && <div role="alert" className="mb-4 flex items-center justify-between gap-4 rounded-xl border border-amber-300/15 bg-amber-300/[0.06] px-4 py-3 text-sm text-amber-100"><span>{error}</span><button onClick={fetchData} className="shrink-0 font-semibold text-amber-200 hover:text-white">Coba lagi</button></div>}
-
-        {/* Table */}
-        <div className="table-wrap">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4 sm:px-6">
-            <div><h2 className="text-sm font-semibold text-white">Submission terbaru</h2><p className="mt-1 text-xs text-gray-500">Daftar dokumen audit yang dikirim anggota</p></div>
-            <span className="rounded-full bg-white/[0.05] px-2.5 py-1 text-xs text-gray-400">{submissions.length} item</span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left px-6">#</th>
-                  <th className="text-left px-6">Judul</th>
-                  <th className="text-left px-6">Member</th>
-                  <th className="text-left px-6">Status</th>
-                  <th className="text-left px-6">Tanggal</th>
-                  <th className="text-left px-6">Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={6} className="text-center py-12 text-gray-600">Memuat data...</td></tr>
-                ) : submissions.length === 0 ? (
-                  <tr><td colSpan={6} className="text-center py-12 text-gray-600">Belum ada submission</td></tr>
-                ) : submissions.map((s, i) => (
-                  <tr key={s.id} className="border-b border-border/50 hover:bg-white/[0.02] transition-colors">
-                    <td className="px-6 py-4 text-gray-600">{i + 1}</td>
-                    <td className="px-6 py-4 text-white font-medium max-w-xs truncate">{s.title}</td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <p className="text-white">{s.member_name}</p>
-                        <p className="text-gray-600 text-xs">{s.member_email}</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4"><StatusBadge status={s.status} /></td>
-                    <td className="px-6 py-4 text-gray-500 text-xs">
-                      {new Date(s.submitted_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </td>
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => navigate(`/admin/submissions/${s.id}`)}
-                        className="text-accent hover:text-accent-hover text-sm font-medium transition-colors"
-                      >
-                        Detail →
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </main>
-    </div>
-  );
+ const {t,locale,formatDate}=useLanguage();
+ const [data,setData]=useState(null);const [error,setError]=useState(false);const [attempt,setAttempt]=useState(0);
+ useEffect(()=>{let active=true;setError(false);Promise.all([api.get('/submissions/stats'),api.get('/submissions'),api.get('/targets')]).then(([stats,submissions,targets])=>{if(active)setData({stats:stats.data,submissions:submissions.data,targets:targets.data})}).catch(()=>{if(active)setError(true)});return()=>{active=false}},[attempt]);
+ if(error)return <ErrorState onRetry={()=>setAttempt(a=>a+1)}/>;if(!data)return <LoadingState/>;
+ const {stats,submissions,targets}=data;
+ const metrics=[['users',stats.totalMembers,t('Anggota tim','Team members')],['file',stats.total,t('Dokumen audit','Audit documents')],['clock',stats.menunggu,t('Menunggu review','Pending reviews')],['check',stats.disetujui,t('Dokumen disetujui','Approved documents')],['target',stats.targetTotal,t('Target ditugaskan','Assigned targets')],['flag',stats.targetCompleted,t('Target selesai','Completed targets')]];
+ const months=(stats.monthly||[]).slice(-6);const max=Math.max(4,...months.map(m=>Math.max(m.submitted,m.approved)));
+ const pending=[...submissions.filter(s=>s.status==='Menunggu').map(s=>({key:`s${s.id}`,title:s.title,name:s.member_name,date:s.submitted_at,path:`/admin/submissions/${s.id}`,icon:'file'})),...targets.filter(s=>s.status==='submitted').map(s=>({key:`t${s.id}`,title:s.title,name:s.assigned_name,date:s.updated_at,path:`/admin/targets/${s.id}`,icon:'target'}))].sort((a,b)=>b.date.localeCompare(a.date));
+ return <div className="workspace-page">
+  <div className="page-heading"><div><span className="eyebrow">{t('Ruang kerja audit','Audit workspace')}</span><h1>{t('Semua progres, dalam satu pandangan.','Every step, in one clear view.')}</h1><p>{t('Pantau pekerjaan tim dan berikan arahan yang tepat.','Keep track of your team and guide what comes next.')}</p></div><Link className="btn-primary" to="/admin/targets?create=1"><Icon name="plus" size={16}/>{t('Buat target','Create target')}</Link></div>
+  <section className="quick-stats" aria-label={t('Statistik ringkas','Quick stats')}><div className="stats-intro"><h2>{t('Statistik ringkas','Quick stats')}</h2><p>{t('Perkembangan tim Anda,','Your team’s progress,')}<br/>{t('tercatat secara langsung.','all in one place.')}</p></div><div className="stats-grid">{metrics.map(([icon,value,label],i)=><div className={`metric ${i===2?'featured':''}`} key={icon}><span className="metric-icon"><Icon name={icon} size={17}/></span><strong>{value??0}</strong><p>{label}</p></div>)}</div></section>
+  <div className="analytics-grid">
+   <section className="panel"><div className="panel-header"><div><h2>{t('Aktivitas audit','Audit activity')}</h2><p>{t('6 bulan terakhir','Last 6 months')}</p></div><div className="chart-legend"><span><i/>{t('Dikirim','Submitted')}</span><span><i className="light"/>{t('Disetujui','Approved')}</span></div></div><div className="bar-chart" role="img" aria-label={t('Jumlah dokumen dikirim dan disetujui per bulan','Monthly submitted and approved documents')}><div className="chart-y">{[max,Math.round(max*.75),Math.round(max*.5),Math.round(max*.25),0].map((v,i)=><span key={i}>{v}</span>)}</div><div className="chart-plot">{months.map(m=><div className="chart-column" key={m.month}><span title={`${m.month}: ${m.submitted} ${t('dikirim','submitted')}`} style={{height:`${m.submitted/max*90}%`}}/><span className="light" title={`${m.month}: ${m.approved} ${t('disetujui','approved')}`} style={{height:`${m.approved/max*90}%`}}/><small>{new Date(`${m.month}-01T12:00:00`).toLocaleDateString(locale,{month:'short'})}</small></div>)}</div>{!months.some(m=>m.submitted>0)&&<div className="chart-empty">{t('Aktivitas akan terlihat setelah dokumen dikirim.','Activity will appear when documents are submitted.')}</div>}</div></section>
+   <section className="panel"><div className="panel-header"><div><h2>{t('Perlu ditinjau','Pending approvals')}</h2><p>{pending.length} {t('pekerjaan menunggu Anda','items need your attention')}</p></div><span className="metric-icon"><Icon name="clock" size={17}/></span></div>{pending.length?<div className="review-list">{pending.slice(0,3).map(item=><Link key={item.key} to={item.path} className="review-item"><span className="avatar avatar-small"><Icon name={item.icon} size={14}/></span><div><strong>{item.title}</strong><small>{item.name} · {formatDate(item.date,{day:'numeric',month:'short'})}</small></div><Icon name="chevron" size={14}/></Link>)}</div>:<EmptyState compact icon="check" title={t('Semua sudah ditinjau','You’re all caught up')} description={t('Pekerjaan yang siap direview akan tampil di sini.','Items ready for review will appear here.')}/>}</section>
+  </div>
+  <section className="panel"><div className="panel-header"><div><h2>{t('Target tim','Team targets')}</h2><p>{t('Dari penugasan hingga pekerjaan selesai.','From assignment to a job well done.')}</p></div><Link className="text-link" to="/admin/targets">{t('Lihat semua','View all')}<Icon name="arrow" size={15}/></Link></div><TargetTable targets={targets.slice(0,5)} compact/><div className="table-footer"><span>{t('Menampilkan','Showing')} {Math.min(5,targets.length)} {t('dari','of')} {targets.length} {t('target','targets')}</span><span>{t('Progres disimpan otomatis setelah dikirim','Progress is saved when submitted')}</span></div></section>
+ </div>;
 }

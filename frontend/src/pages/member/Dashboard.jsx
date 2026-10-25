@@ -1,101 +1,21 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Navbar from '../../components/Navbar';
-import StatusBadge from '../../components/StatusBadge';
+﻿import { useEffect,useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
-
-export default function MemberDashboard() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [submissions, setSubmissions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    api.get('/submissions/mine')
-      .then(r => setSubmissions(r.data))
-      .catch(() => setError('Dokumen belum dapat dimuat. Periksa koneksi backend dan coba lagi.'))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const counts = {
-    total: submissions.length,
-    menunggu: submissions.filter(s => s.status === 'Menunggu').length,
-    disetujui: submissions.filter(s => s.status === 'Disetujui').length,
-    revisi: submissions.filter(s => s.status === 'Perlu Revisi').length,
-  };
-
-  return (
-    <div className="min-h-screen bg-bg">
-      <Navbar />
-      <main className="page-container max-w-[1050px]">
-        <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <span className="eyebrow">Ruang kerja member</span>
-            <h1 className="text-3xl font-bold tracking-tight text-white">Halo, {user?.name?.split(' ')[0]}</h1>
-            <p className="mt-2 text-sm text-gray-400">Pantau status dokumen dan progres review audit Anda.</p>
-          </div>
-          <button onClick={() => navigate('/member/upload')} className="btn-primary w-full sm:w-auto">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            Kirim dokumen audit
-          </button>
-        </div>
-
-        <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-          {[
-            { label: 'Total dokumen', value: counts.total, color: 'text-[#7EA0C5]' },
-            { label: 'Menunggu review', value: counts.menunggu, color: 'text-amber-300' },
-            { label: 'Disetujui', value: counts.disetujui, color: 'text-emerald-300' },
-            { label: 'Perlu revisi', value: counts.revisi, color: 'text-rose-300' },
-          ].map(s => (
-            <div key={s.label} className="card stat-card">
-              <p className={`text-3xl font-bold ${s.color}`}>{s.value}</p>
-              <p>{s.label}</p>
-            </div>
-          ))}
-        </div>
-
-        {error && <div role="alert" className="mb-4 rounded-xl border border-amber-300/15 bg-amber-300/[0.06] px-4 py-3 text-sm text-amber-100">{error} <button onClick={() => { setLoading(true); setError(''); api.get('/submissions/mine').then(r => setSubmissions(r.data)).catch(() => setError('Dokumen belum dapat dimuat. Periksa koneksi backend dan coba lagi.')).finally(() => setLoading(false)); }} className="ml-2 font-semibold text-amber-200">Coba lagi</button></div>}
-
-        <section className="table-wrap">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4 sm:px-6">
-            <div><h2 className="font-semibold text-white">Riwayat dokumen</h2><p className="mt-1 text-xs text-gray-500">Semua pengiriman audit Anda</p></div>
-            <span className="rounded-full bg-white/[0.05] px-2.5 py-1 text-xs text-gray-400">{submissions.length} item</span>
-          </div>
-          {loading ? (
-            <div className="py-16 text-center text-gray-500"><span className="mx-auto mb-3 block h-6 w-6 animate-spin rounded-full border-2 border-[#7EA0C5]/20 border-t-[#7EA0C5]" />Memuat dokumen...</div>
-          ) : submissions.length === 0 ? (
-            <div className="py-16 px-6 text-center">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#7EA0C5]/10 bg-[#7EA0C5]/[0.06] text-[#C2E8FF]">
-                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-              </div>
-              <p className="font-medium text-slate-200">Belum ada dokumen audit</p>
-              <p className="mt-1 text-sm text-gray-500">Kirim dokumen pertama Anda untuk memulai proses review.</p>
-              <button onClick={() => navigate('/member/upload')} className="btn-primary mt-5 text-sm">Kirim dokumen pertama</button>
-            </div>
-          ) : (
-            <div className="divide-y divide-border/70">
-              {submissions.map(s => (
-                <div key={s.id} className="flex flex-col gap-4 px-5 py-5 transition-colors hover:bg-white/[0.025] sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                  <div className="mr-4 min-w-0 flex-1">
-                    <p className="truncate font-medium text-white">{s.title}</p>
-                    <p className="mt-1 truncate text-xs text-gray-500">
-                      {new Date(s.submitted_at).toLocaleDateString('id-ID', { dateStyle: 'long' })} · {s.file_name}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center justify-between gap-4 sm:justify-start">
-                    <StatusBadge status={s.status} />
-                    <button onClick={() => navigate(`/member/submissions/${s.id}`)} className="text-sm font-medium text-[#7EA0C5] transition-colors hover:text-white">
-                      Lihat detail <span aria-hidden="true">→</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      </main>
-    </div>
-  );
+import { useLanguage } from '../../context/LanguageContext';
+import Icon from '../../components/Icon';
+import StatusBadge from '../../components/StatusBadge';
+import SubmissionTable from '../../components/SubmissionTable';
+import {ProgressBar} from '../../components/TargetTable';
+import {EmptyState,ErrorState,LoadingState} from '../../components/States';
+export default function MemberDashboard(){
+ const {user}=useAuth();const {t,formatDate}=useLanguage();const [data,setData]=useState(null);const [error,setError]=useState(false);const [retry,setRetry]=useState(0);
+ useEffect(()=>{let active=true;setError(false);Promise.all([api.get('/targets'),api.get('/submissions/mine')]).then(([a,b])=>{if(active)setData({targets:a.data,submissions:b.data})}).catch(()=>{if(active)setError(true)});return()=>{active=false}},[retry]);
+ if(error)return <ErrorState onRetry={()=>setRetry(n=>n+1)}/>;if(!data)return <LoadingState/>;
+ const active=data.targets.filter(item=>item.status!=='completed');const done=data.targets.length-active.length;
+ return <div className="workspace-page"><div className="member-welcome"><div><span className="eyebrow" style={{color:'#C2E8FF'}}>{t('Ruang kerja Anda','Your workspace')}</span><h1>{t('Halo','Hello')}, {user?.name?.split(' ')[0]}.</h1><p>{t('Satu langkah lebih dekat dengan target Anda. Lanjutkan pekerjaan dan beri kabar kepada tim.','One step closer to your goals. Continue your work and keep your team in the loop.')}</p></div><span className="welcome-target"><Icon name="target" size={43}/></span></div>
+ <div className="stats-grid four section-space">{[[data.targets.length,t('Total target','Total targets'),'target'],[active.length,t('Target aktif','Active targets'),'clock'],[done,t('Target selesai','Completed targets'),'check'],[data.submissions.length,t('Dokumen terkirim','Submitted documents'),'file']].map(([value,label,icon],i)=><div className={`metric ${i===1?'featured':''}`} key={icon}><span className="metric-icon"><Icon name={icon} size={17}/></span><strong>{value}</strong><p>{label}</p></div>)}</div>
+ <section className="panel section-space"><div className="panel-header"><div><h2>{t('Fokus pekerjaan Anda','Your work in focus')}</h2><p>{t('Target aktif yang memerlukan perhatian.','Active targets that need your attention.')}</p></div><Link className="text-link" to="/member/targets">{t('Lihat semua','View all')}<Icon name="arrow" size={14}/></Link></div>{active.length?active.slice(0,4).map(item=><Link className="work-card" key={item.id} to={`/member/targets/${item.id}`}><span className="avatar"><Icon name="target" size={18}/></span><div><strong>{item.title}</strong><small>{t('Tenggat','Due')} {formatDate(item.due_date)}</small><ProgressBar value={item.progress}/></div><StatusBadge status={item.status}/><Icon name="chevron" size={17}/></Link>):<EmptyState icon="target" title={t('Tidak ada target aktif','No active targets')} description={t('Penugasan baru dari admin akan tampil di sini.','New assignments from your administrator will appear here.')}/>}</section>
+ <section className="panel"><div className="panel-header"><div><h2>{t('Dokumen terbaru','Recent documents')}</h2><p>{t('Hasil kerja yang telah Anda kirim.','Work you have shared with the team.')}</p></div><Link className="btn-secondary" to="/member/upload"><Icon name="upload" size={15}/>{t('Kirim dokumen','Upload document')}</Link></div><SubmissionTable items={data.submissions.slice(0,4)}/></section>
+ </div>;
 }

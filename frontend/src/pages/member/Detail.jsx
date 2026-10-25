@@ -1,36 +1,43 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import Navbar from '../../components/Navbar';
+import { Link, useParams } from 'react-router-dom';
 import StatusBadge from '../../components/StatusBadge';
+import { useLanguage } from '../../context/LanguageContext';
 import api from '../../api/axios';
 
-const UPLOADS_URL = import.meta.env.VITE_UPLOADS_URL || 'http://localhost:3001/uploads';
+const UPLOADS_URL = (import.meta.env.VITE_UPLOADS_URL || 'http://localhost:3001/uploads').replace(/\/$/, '');
 
 export default function MemberDetail() {
   const { id } = useParams();
-  const navigate = useNavigate();
+  const { t, formatDate } = useLanguage();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [replyDrafts, setReplyDrafts] = useState({});
   const [replyingTo, setReplyingTo] = useState(null);
-  const [replyError, setReplyError] = useState('');
   const [replyErrorFor, setReplyErrorFor] = useState(null);
+  const [replySuccessFor, setReplySuccessFor] = useState(null);
 
   useEffect(() => {
-    api.get(`/submissions/${id}`)
-      .then(r => setData(r.data))
-      .catch(() => navigate('/member'))
-      .finally(() => setLoading(false));
-  }, [id]);
+    const controller = new AbortController();
+    setLoading(true);
+    setLoadError(false);
+    setReplyErrorFor(null);
+    setReplySuccessFor(null);
+    api.get(`/submissions/${id}`, { signal: controller.signal })
+      .then(response => setData(response.data))
+      .catch(() => { if (!controller.signal.aborted) setLoadError(true); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [id, attempt]);
 
-  async function handleReply(e, comment) {
-    e.preventDefault();
+  async function handleReply(event, comment) {
+    event.preventDefault();
     const body = (replyDrafts[comment.id] || '').trim();
     if (!body || replyingTo !== null) return;
-
     setReplyingTo(comment.id);
-    setReplyError('');
     setReplyErrorFor(null);
+    setReplySuccessFor(null);
     try {
       const { data: result } = await api.post(`/comments/${id}/${comment.id}/replies`, { body });
       setData(current => ({
@@ -40,130 +47,47 @@ export default function MemberDetail() {
           : item),
       }));
       setReplyDrafts(current => ({ ...current, [comment.id]: '' }));
-    } catch (err) {
-      setReplyError(err.response?.data?.message || 'Balasan gagal dikirim. Coba lagi.');
-      setReplyErrorFor(comment.id);
-    } finally {
-      setReplyingTo(null);
-    }
+      setReplySuccessFor(comment.id);
+    } catch { setReplyErrorFor(comment.id); }
+    finally { setReplyingTo(null); }
   }
 
-  if (loading) return <div className="min-h-screen bg-bg flex items-center justify-center text-gray-500">Memuat...</div>;
+  if (loading) return <div role="status" className="panel p-10 text-center text-sm text-slate-500">{t('Memuat dokumen...', 'Loading document...')}</div>;
+  if (loadError || !data) return <div className="panel p-8"><h1 className="text-lg font-semibold text-[#052659]">{t('Dokumen belum dapat ditampilkan', 'Unable to display this document')}</h1><p role="alert" className="mt-2 text-sm text-slate-500">{t('Periksa koneksi atau pastikan dokumen masih tersedia.', 'Check your connection or make sure the document is still available.')}</p><div className="mt-5 flex flex-wrap gap-3"><button className="btn-primary" onClick={() => setAttempt(value => value + 1)}>{t('Coba lagi', 'Try again')}</button><Link className="btn-secondary" to="/member">{t('Ke dasbor', 'Back to dashboard')}</Link></div></div>;
 
   return (
-    <div className="min-h-screen bg-bg">
-      <Navbar />
-      <main className="page-container max-w-[900px]">
-        <button onClick={() => navigate('/member')} className="back-link">
-          ← Kembali ke Dashboard
-        </button>
-
-        <div className="card mb-6">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h1 className="text-xl font-bold text-white">{data.title}</h1>
-              <p className="text-gray-500 text-sm mt-1">
-                Diunggah pada {new Date(data.submitted_at).toLocaleDateString('id-ID', { dateStyle: 'long' })}
-              </p>
-            </div>
-            <StatusBadge status={data.status} />
-          </div>
-
-          {data.description && (
-            <p className="text-gray-400 text-sm leading-relaxed mb-4">{data.description}</p>
-          )}
-
-          <div className="pt-4 border-t border-border">
-            <p className="text-xs text-gray-500 mb-2">Dokumen Terlampir</p>
-            <a
-              href={`${UPLOADS_URL}/${data.file_path}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 text-accent hover:text-accent-hover text-sm font-medium transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              {data.file_name}
-            </a>
-          </div>
-        </div>
-
-        {/* Admin feedback and member replies */}
-        <div className="card">
-          <h2 className="font-semibold text-white mb-4">
-            Feedback dan balasan
-            {data.comments?.length > 0 && (
-              <span className="ml-2 text-xs bg-accent/20 text-accent px-2 py-0.5 rounded-full">{data.comments.length}</span>
-            )}
-          </h2>
-          {data.comments?.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-600 text-sm">Belum ada feedback dari admin.</p>
-              {data.status === 'Menunggu' && (
-                <p className="text-gray-700 text-xs mt-1">Submission Anda sedang menunggu review.</p>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {data.comments.map(c => (
-                <div key={c.id} className="rounded-2xl border border-border bg-bg p-4 sm:p-5">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-accent text-xs font-bold">
-                        {c.admin_name?.charAt(0).toUpperCase()}
-                      </div>
-                      <span className="text-accent text-sm font-medium">{c.admin_name}</span>
-                    </div>
-                    <span className="text-gray-600 text-xs">
-                      {new Date(c.created_at).toLocaleDateString('id-ID', { dateStyle: 'medium' })}
-                    </span>
-                  </div>
-                  <p className="text-gray-200 text-sm leading-relaxed">{c.body}</p>
-
-                  {c.replies?.length > 0 && (
-                    <div className="mt-4 space-y-3 border-l border-[#5482B4]/40 pl-4 sm:ml-3 sm:pl-5">
-                      {c.replies.map(reply => (
-                        <div key={reply.id} className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-3">
-                          <div className="mb-2 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2">
-                              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#5482B4]/20 text-xs font-semibold text-[#C2E8FF]">{reply.author_name?.charAt(0).toUpperCase()}</div>
-                              <span className="text-sm font-medium text-[#C2E8FF]">{reply.author_name} <span className="ml-1 text-[10px] font-normal uppercase tracking-wide text-gray-500">Anda</span></span>
-                            </div>
-                            <span className="text-[11px] text-gray-500">{new Date(reply.created_at).toLocaleDateString('id-ID', { dateStyle: 'medium' })}</span>
-                          </div>
-                          <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-300">{reply.body}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <form onSubmit={e => handleReply(e, c)} className="mt-4">
-                    <label className="sr-only" htmlFor={`reply-${c.id}`}>Balas komentar admin</label>
-                    <textarea
-                      id={`reply-${c.id}`}
-                      className="input min-h-[78px] resize-y text-sm"
-                      placeholder="Tulis balasan untuk admin..."
-                      value={replyDrafts[c.id] || ''}
-                      onChange={e => setReplyDrafts(current => ({ ...current, [c.id]: e.target.value }))}
-                      maxLength={2000}
-                      rows={2}
-                    />
-                    {replyError && replyErrorFor === c.id && <p role="alert" className="mt-2 text-xs text-rose-300">{replyError}</p>}
-                    <div className="mt-2 flex items-center justify-between gap-3">
-                      <span className="text-[11px] text-gray-600">Balasan akan terlihat oleh tim audit.</span>
-                      <button type="submit" className="btn-primary px-3 py-2 text-xs" disabled={replyingTo !== null || !(replyDrafts[c.id] || '').trim()}>
-                        {replyingTo === c.id ? 'Mengirim...' : 'Kirim balasan'}
-                        {replyingTo !== c.id && <span aria-hidden="true">→</span>}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </main>
+    <div className="mx-auto max-w-[920px] space-y-6">
+      <Link to="/member" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#052659]"><span aria-hidden="true">&larr;</span>{t('Kembali ke dasbor', 'Back to dashboard')}</Link>
+      <div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#052659]">{t('Dokumen saya', 'My document')}</p><h1 className="page-title break-words">{data.title}</h1><p className="page-subtitle">{t('Dikirim pada', 'Submitted on')} {formatDate(data.submitted_at, { dateStyle: 'long' })}</p></div>
+      <section className="panel p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold text-[#052659]">{t('Detail dokumen', 'Document details')}</h2><StatusBadge status={data.status}/></div>
+        <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-slate-600">{data.description || t('Tidak ada deskripsi tambahan.', 'No additional description.')}</p>
+        {data.target_id && <p className="mt-4 text-xs font-medium text-[#052659]">{t('Terkait target', 'Linked to target')} #{data.target_id}</p>}
+        <a href={`${UPLOADS_URL}/${encodeURIComponent(data.file_path)}`} target="_blank" rel="noreferrer" className="mt-5 flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-[#C2E8FF] hover:bg-[#C2E8FF]/20">
+          <span aria-hidden="true" className="flex h-11 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-[#052659]"><svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M14 3H6v18h12V7l-4-4Z"/><path d="M14 3v5h5M9 12h6M9 16h4"/></svg></span>
+          <span className="min-w-0 flex-1"><span className="block break-all text-sm font-medium text-[#052659]">{data.file_name}</span><span className="mt-1 block text-xs text-slate-500">{t('Buka lampiran di tab baru', 'Open attachment in a new tab')}</span></span><span aria-hidden="true" className="text-[#052659]">↗</span>
+        </a>
+      </section>
+      <section className="panel p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-3"><h2 className="font-semibold text-[#052659]">{t('Diskusi & umpan balik', 'Discussion & feedback')}</h2><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">{data.comments?.length || 0}</span></div>
+        <p className="mt-2 text-xs leading-5 text-slate-500">{t('Baca catatan admin dan balas untuk menindaklanjuti pekerjaan Anda.', 'Read your admin’s notes and reply to follow up on your work.')}</p>
+        {!data.comments?.length ? <div className="mt-6 rounded-xl border border-dashed border-slate-200 px-5 py-10 text-center"><p className="text-sm font-medium text-slate-600">{t('Belum ada komentar dari admin.', 'No comments from your admin yet.')}</p><p className="mt-2 text-xs text-slate-400">{data.status === 'Menunggu' ? t('Dokumen Anda sedang menunggu peninjauan.', 'Your document is waiting for review.') : t('Komentar dan balasan akan muncul di sini.', 'Comments and replies will appear here.')}</p></div> : (
+          <div className="mt-6 space-y-5">{data.comments.map(comment => (
+            <article key={comment.id} className="rounded-2xl border border-slate-200 p-4 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex min-w-0 items-center gap-2.5"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#C2E8FF]/60 text-xs font-semibold text-[#052659]">{comment.admin_name?.charAt(0).toUpperCase()}</span><span className="break-words text-sm font-semibold text-[#052659]">{comment.admin_name}<span className="ml-2 text-[10px] font-normal text-slate-500">{t('Admin', 'Admin')}</span></span></div><time className="text-[11px] text-slate-400">{formatDate(comment.created_at, { dateStyle: 'medium', timeStyle: 'short' })}</time></div>
+              <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600">{comment.body}</p>
+              {!!comment.replies?.length && <div className="mt-4 space-y-3 border-l-2 border-[#C2E8FF] pl-4">{comment.replies.map(reply => <div key={reply.id} className="rounded-xl bg-slate-50 p-3 sm:p-4"><div className="flex flex-wrap justify-between gap-2"><span className="break-words text-xs font-semibold text-[#052659]">{reply.author_name}<span className="ml-2 font-normal text-slate-400">{t('Anda', 'You')}</span></span><time className="text-[10px] text-slate-400">{formatDate(reply.created_at, { dateStyle: 'medium', timeStyle: 'short' })}</time></div><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600">{reply.body}</p></div>)}</div>}
+              <form onSubmit={event => handleReply(event, comment)} className="mt-5 border-t border-slate-100 pt-4">
+                <label className="label" htmlFor={`reply-${comment.id}`}>{t('Balas komentar', 'Reply to this comment')}</label>
+                <textarea id={`reply-${comment.id}`} className="input min-h-[88px] resize-y" placeholder={t('Tulis balasan untuk admin...', 'Write a reply to your admin...')} value={replyDrafts[comment.id] || ''} onChange={event => { setReplyDrafts(current => ({ ...current, [comment.id]: event.target.value })); if (replySuccessFor === comment.id) setReplySuccessFor(null); }} maxLength={2000} rows={2} required disabled={replyingTo === comment.id}/>
+                {replyErrorFor === comment.id && <p role="alert" className="mt-2 text-xs text-rose-600">{t('Balasan belum terkirim. Silakan coba lagi.', 'Your reply was not sent. Please try again.')}</p>}
+                {replySuccessFor === comment.id && <p role="status" className="mt-2 text-xs text-emerald-700">{t('Balasan berhasil dikirim.', 'Reply sent successfully.')}</p>}
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><span className="text-[11px] text-slate-400">{(replyDrafts[comment.id] || '').length}/2000 &middot; {t('Terlihat oleh tim audit', 'Visible to your audit team')}</span><button type="submit" className="btn-primary" disabled={replyingTo !== null || !(replyDrafts[comment.id] || '').trim()}>{replyingTo === comment.id ? t('Mengirim...', 'Sending...') : t('Kirim balasan', 'Send reply')}<span aria-hidden="true">&rarr;</span></button></div>
+              </form>
+            </article>
+          ))}</div>
+        )}
+      </section>
     </div>
   );
 }
