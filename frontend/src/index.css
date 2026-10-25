@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Inter', sans-serif;
+  color: #e8edf6;
+  background: #011025;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
+}
+
+* { box-sizing: border-box; }
+html { min-width: 320px; background: #011025; }
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  color: #e8edf6;
+  background:
+    radial-gradient(ellipse at 8% 0%, rgba(84, 130, 180, .22), transparent 34rem),
+    radial-gradient(ellipse at 100% 30%, rgba(194, 232, 255, .07), transparent 28rem),
+    #011025;
+  font-size: 14px;
+}
+
+button, input, textarea { font: inherit; }
+button { cursor: pointer; }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 3px solid rgba(194, 232, 255, .6);
+  outline-offset: 2px;
+}
+::selection { background: rgba(84, 130, 180, .55); color: white; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #052659; }
+::-webkit-scrollbar-thumb { background: #5482B4; border: 2px solid #052659; border-radius: 8px; }
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover text-white font-semibold px-4 py-2.5 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    box-shadow: 0 8px 22px rgba(84, 130, 180, .22);
+  }
+  .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(84, 130, 180, .32); }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 bg-white/[0.03] border border-border hover:bg-white/[0.06] hover:border-slate-500 text-gray-300 font-medium px-4 py-2.5 rounded-xl transition-all duration-200;
+  }
+  .card {
+    @apply bg-surface/90 border border-border rounded-2xl p-6;
+    box-shadow: 0 16px 44px rgba(0, 0, 0, .12);
+  }
+  .input {
+    @apply w-full bg-[#011025] border border-border rounded-xl px-4 py-3 text-white placeholder-gray-400/70 focus:outline-none focus:border-accent transition-colors;
+  }
+  .label { @apply block text-[13px] font-medium text-gray-300 mb-2; }
+}
+
+.page-container { width: min(100% - 48px, 1180px); margin: 0 auto; padding: 40px 0 64px; }
+.page-heading { margin-bottom: 28px; }
+.page-heading h1 { margin: 0; color: #f8fafc; font-size: clamp(25px, 3vw, 32px); font-weight: 700; letter-spacing: -.04em; }
+.page-heading p { margin: 8px 0 0; color: #8c99ad; font-size: 14px; }
+.eyebrow { display: block; margin-bottom: 10px; color: #C2E8FF; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.stat-card { position: relative; overflow: hidden; text-align: left; transition: transform .2s ease, border-color .2s ease; }
+.stat-card:hover { transform: translateY(-2px); border-color: #5482B4; }
+.stat-card p:first-child { font-size: 30px; line-height: 1; letter-spacing: -.04em; }
+.stat-card p:last-child { color: #94a3b8; font-size: 12px; font-weight: 500; margin-top: 10px; }
+.table-wrap { border: 1px solid #1d426f; border-radius: 18px; background: rgba(5, 38, 89, .9); overflow: hidden; box-shadow: 0 16px 44px rgba(0,0,0,.18); }
+.table-wrap th { background: rgba(255,255,255,.025); color: #8391a7; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; white-space: nowrap; }
+.table-wrap td, .table-wrap th { padding-top: 16px; padding-bottom: 16px; }
+.table-wrap tbody tr:last-child { border-bottom: 0; }
+.back-link { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 24px; color: #98a5b8; font-size: 13px; transition: color .2s ease; }
+.back-link:hover { color: #fff; }
+
+@media (max-width: 640px) {
+  .page-container { width: min(100% - 32px, 1180px); padding: 28px 0 48px; }
+  .card { padding: 20px; }
+  .stat-card p:first-child { font-size: 26px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}

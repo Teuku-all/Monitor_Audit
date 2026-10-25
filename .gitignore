@@ -1,0 +1,16 @@
+# Dependencies and generated frontend output
+**/node_modules/
+**/dist/
+
+# Local environment configuration
+.env*
+!.env.example
+
+# Local database and uploaded audit documents
+backend/src/config/*.db
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Local editor configuration and logs
+.vscode/
+*.log
