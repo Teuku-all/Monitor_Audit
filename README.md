@@ -12,7 +12,7 @@ Requirements: Node.js 20+ and npm.
 4. Create a Cloudinary account and set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` in the root `.env`.
 5. Set a random `JWT_SECRET` of at least 32 characters and set a password of at least 12 characters in `ADMIN_PASSWORD` for the initial administrator.
 6. In `backend/`, run `npm install` and then `npm run dev`.
-7. Set `VITE_API_URL=http://localhost:3001/api` in the root `.env`, then run `npm install` and `npm run dev` in `frontend/`.
+7. Keep `VITE_API_URL=/api` in the root `.env`. The Vite development proxy forwards `/api` to the local backend, and Vercel routes `/api` to the deployed backend. Then run `npm install` and `npm run dev` in `frontend/`.
 8. Open `http://localhost:5173`.
 
 The backend creates or updates the required tables in Neon at startup. Existing SQLite data is not automatically migrated; migrate existing accounts and submissions before switching a deployment to Neon. New document uploads are stored as authenticated Cloudinary assets and are downloaded only through an authorized API endpoint.
@@ -31,7 +31,7 @@ The repository is configured as one Vercel project: Vercel builds the Vite front
    - `ADMIN_EMAIL` and `ADMIN_PASSWORD`
    - `GOOGLE_CLIENT_ID`
    - `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET`
-3. Add `VITE_GOOGLE_CLIENT_ID` with the same Google Web client ID. Set `VITE_API_URL=/api` if you want to explicitly configure the same-origin API URL; this is also the production default.
+3. Add `VITE_GOOGLE_CLIENT_ID` with the same Google Web client ID. The production build always uses the same-origin `/api` endpoint.
    Keep `ALLOW_PUBLIC_REGISTRATION` and `VITE_ALLOW_REGISTRATION` disabled for an internal audit workspace.
 4. In Google Cloud OAuth settings, add the production Vercel domain (and any custom domain) to **Authorized JavaScript origins**. The canonical production Vercel hostname is allowed by the API automatically. Add custom domains to `CORS_ORIGINS` (comma-separated if there are multiple). Preview deployments are not trusted by default; only add one explicitly if it is isolated from production data.
 5. Deploy. The first API request initializes the Neon schema and provisions the configured administrator.

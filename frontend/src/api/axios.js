@@ -1,7 +1,9 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3001/api' : '/api'),
+  // The production frontend and API share one origin on Vercel. Never bake a
+  // developer's localhost API URL into a production bundle.
+  baseURL: import.meta.env.PROD ? '/api' : (import.meta.env.VITE_API_URL || '/api'),
   timeout: 30000,
   withCredentials: true,
 });
