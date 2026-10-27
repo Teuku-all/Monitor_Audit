@@ -6,10 +6,10 @@ const { initDB } = require('./src/config/db');
 const { securityHeaders, apiLimiter, noStore, isAllowedOrigin } = require('./src/middleware/security');
 
 if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is required. Copy .env.example to .env and set a secret.');
-if (process.env.NODE_ENV === 'production' && process.env.JWT_SECRET.length < 32) throw new Error('JWT_SECRET must contain at least 32 characters in production.');
+if (process.env.NODE_ENV === 'production' && process.env.JWT_SECRET.length < 20) throw new Error('JWT_SECRET must contain at least 20 characters in production.');
 if (process.env.NODE_ENV === 'production' && process.env.ADMIN_PASSWORD
-  && (process.env.ADMIN_PASSWORD.length < 12 || Buffer.byteLength(process.env.ADMIN_PASSWORD, 'utf8') > 72)) {
-  throw new Error('ADMIN_PASSWORD must contain at least 12 characters and at most 72 bytes in production.');
+  && (process.env.ADMIN_PASSWORD.length < 8 || Buffer.byteLength(process.env.ADMIN_PASSWORD, 'utf8') > 72)) {
+  throw new Error('ADMIN_PASSWORD must contain at least 8 characters and at most 72 bytes in production.');
 }
 const app = express();
 app.disable('x-powered-by');

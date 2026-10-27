@@ -10,7 +10,7 @@ Requirements: Node.js 20+ and npm.
 2. Create a Neon project and set its PostgreSQL connection string as `DATABASE_URL` in the root `.env`.
 3. Create a Google OAuth 2.0 Web client ID. Add the local frontend origin (`http://localhost:5173`) to its authorized JavaScript origins. Set the same client ID in `GOOGLE_CLIENT_ID` and `VITE_GOOGLE_CLIENT_ID` in the root `.env`.
 4. Create a Cloudinary account and set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` in the root `.env`.
-5. Set a random `JWT_SECRET` of at least 32 characters and set a password of at least 12 characters in `ADMIN_PASSWORD` for the initial administrator.
+5. Set a random `JWT_SECRET` of at least 20 characters and set a password of at least 8 characters in `ADMIN_PASSWORD` for the initial administrator.
 6. In `backend/`, run `npm install` and then `npm run dev`.
 7. Keep `VITE_API_URL=/api` in the root `.env`. The Vite development proxy forwards `/api` to the local backend, and Vercel routes `/api` to the deployed backend. Then run `npm install` and `npm run dev` in `frontend/`.
 8. Open `http://localhost:5173`.
@@ -26,9 +26,9 @@ The repository is configured as one Vercel project: Vercel builds the Vite front
 1. Import this repository into Vercel and leave the project root directory set to the repository root. The included `vercel.json` configures install, build, output, API routing, and SPA fallback.
 2. Add these backend environment variables in Vercel for each environment you deploy (Vercel does not load the local root `.env` file):
    - `DATABASE_URL` (Neon connection string)
-   - `JWT_SECRET` (random value of at least 32 characters)
+   - `JWT_SECRET` (random value of at least 20 characters)
    - `SESSION_HOURS` (optional, defaults to 4 and accepts 1–24)
-   - `ADMIN_EMAIL` and `ADMIN_PASSWORD`
+   - `ADMIN_EMAIL` and `ADMIN_PASSWORD` (at least 8 characters; at most 72 bytes)
    - `GOOGLE_CLIENT_ID`
    - `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET`
 3. Add `VITE_GOOGLE_CLIENT_ID` with the same Google Web client ID. The production build always uses the same-origin `/api` endpoint.
