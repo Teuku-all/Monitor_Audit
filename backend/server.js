@@ -27,6 +27,7 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use('/api/auth', require('./src/routes/auth'));
 app.use('/api/submissions', require('./src/routes/submissions'));
 app.use('/api/comments', require('./src/routes/comments'));
+app.use('/api/coaching', require('./src/routes/coaching'));
 app.use('/api/targets', require('./src/routes/targets'));
 app.use('/api/users', require('./src/routes/users'));
 app.get('/', (req, res) => res.json({ status: 'Audit Monitor API running', version: '1.1.0' }));

@@ -1,4 +1,4 @@
-import { createContext, useContext, useLayoutEffect, useState } from 'react';
+import { createContext, useContext, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
 const ThemeContext = createContext(null);
@@ -14,6 +14,7 @@ function getInitialTheme() {
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(getInitialTheme);
+  const switching = useRef(false);
 
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -26,6 +27,7 @@ export function ThemeProvider({ children }) {
   }, [theme]);
 
   function toggleTheme(event) {
+    if (switching.current) return;
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
     const root = document.documentElement;
     const rect = event?.currentTarget?.getBoundingClientRect?.();
@@ -36,11 +38,20 @@ export function ThemeProvider({ children }) {
     }
 
     const applyTheme = () => flushSync(() => setTheme(nextTheme));
-    if (typeof document.startViewTransition === 'function') {
-      document.startViewTransition(applyTheme);
-    } else {
+    if (typeof document.startViewTransition !== 'function'
+      || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       applyTheme();
+      return;
     }
+
+    switching.current = true;
+    root.dataset.themeTransitioning = 'true';
+    const transition = document.startViewTransition(applyTheme);
+    const finish = () => {
+      delete root.dataset.themeTransitioning;
+      switching.current = false;
+    };
+    transition.finished.then(finish, finish);
   }
 
   return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>;

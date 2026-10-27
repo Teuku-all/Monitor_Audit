@@ -9,3 +9,9 @@
 # Local editor configuration and logs
 .vscode/
 *.log
+
+# Local data and uploaded documents
+backend/src/config/*.db
+backend/src/config/*.db-shm
+backend/src/config/*.db-wal
+backend/uploads/

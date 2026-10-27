@@ -178,6 +178,9 @@ test('PostgreSQL routes retain auth, permissions, targets, uploads, and discussi
     description: 'Review the evidence and submit findings.',
     assigned_to: ownerId,
     due_date: '2030-12-20',
+    start_date: '2030-12-01',
+    reviewer: 'Audit lead',
+    evidence_needed: 'Signed workpapers',
     priority: 'high',
   };
   assert.equal((await request('/targets', { token: owner.token, method: 'POST', body: targetBody })).status, 403);
@@ -191,9 +194,16 @@ test('PostgreSQL routes retain auth, permissions, targets, uploads, and discussi
     method: 'POST',
     body: { ...targetBody, due_date: '2030-02-31' },
   })).status, 400);
+  assert.equal((await request('/targets', {
+    token: admin.token,
+    method: 'POST',
+    body: { ...targetBody, start_date: '2030-12-21' },
+  })).status, 400);
   const created = await request('/targets', { token: admin.token, method: 'POST', body: targetBody });
   assert.equal(created.status, 201);
   assert.equal(created.data.assigned_name, 'Member One');
+  assert.equal(created.data.reviewer, 'Audit lead');
+  assert.equal(created.data.evidence_needed, 'Signed workpapers');
   const targetId = created.data.id;
   const other = await login('other@example.test', memberPassword);
   assert.equal((await request('/targets', { token: other.token })).data.length, 0);
@@ -211,9 +221,26 @@ test('PostgreSQL routes retain auth, permissions, targets, uploads, and discussi
   const progress = await request(`/targets/${targetId}/progress`, {
     token: owner.token,
     method: 'PATCH',
-    body: { progress: 35, note: 'Evidence is being reviewed.' },
+    body: { progress: 35, note: 'Evidence is being reviewed.', audit_status: 'Menunggu Data', data_progress: 70, analysis_progress: 20, workpaper_progress: 10 },
   });
   assert.equal(progress.data.status, 'in_progress');
+  assert.equal(progress.data.audit_status, 'Menunggu Data');
+  assert.equal(progress.data.data_progress, 70);
+  assert.equal((await request(`/targets/${targetId}/progress`, {
+    token: owner.token,
+    method: 'PATCH',
+    body: { progress: 40, audit_status: 'Terhambat' },
+  })).status, 400);
+  const coachingBody = { target_id: targetId, coaching_date: '2030-12-05', progress_at_coaching: 35, issue: 'Missing invoices', guidance: 'Request them from finance', follow_up: 'Contact finance', due_date: '2030-12-10', status: 'Berjalan' };
+  assert.equal((await request('/coaching', { token: owner.token, method: 'POST', body: coachingBody })).status, 403);
+  const coaching = await request('/coaching', { token: admin.token, method: 'POST', body: coachingBody });
+  assert.equal(coaching.status, 201);
+  assert.equal(coaching.data.member_name, 'Member One');
+  assert.equal((await request('/coaching', { token: other.token })).data.length, 0);
+  assert.equal((await request(`/coaching/${coaching.data.id}`, { token: other.token, method: 'PATCH', body: { status: 'Selesai' } })).status, 403);
+  const followUp = await request(`/coaching/${coaching.data.id}`, { token: owner.token, method: 'PATCH', body: { status: 'Selesai', notes: 'Invoices received' } });
+  assert.equal(followUp.status, 200);
+  assert.equal(followUp.data.notes, 'Invoices received');
   assert.equal((await request('/submissions', {
     token: other.token,
     method: 'POST',

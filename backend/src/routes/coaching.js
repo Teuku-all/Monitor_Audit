@@ -1,0 +1,10 @@
+const router = require('express').Router();
+const { authenticate } = require('../middleware/auth');
+const { requireRole } = require('../middleware/roleCheck');
+const asyncHandler = require('../middleware/asyncHandler');
+const controller = require('../controllers/coachingController');
+router.use(asyncHandler(authenticate));
+router.get('/', asyncHandler(controller.list));
+router.post('/', requireRole('admin'), asyncHandler(controller.create));
+router.patch('/:id', requireRole('member'), asyncHandler(controller.update));
+module.exports = router;

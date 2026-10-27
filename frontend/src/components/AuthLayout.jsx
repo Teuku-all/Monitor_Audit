@@ -3,12 +3,12 @@ import { useLanguage } from '../context/LanguageContext';
 import BrandMark from './BrandMark';
 import ThemeToggle from './ThemeToggle';
 
-export default function AuthLayout({ children }) {
+export default function AuthLayout({ children, transitionOut = false }) {
   const { language, setLanguage, t } = useLanguage();
   const { pathname } = useLocation();
   return (
-    <main className="auth-layout flex min-h-screen items-center justify-center bg-[#FFFFFF] p-4 sm:p-8">
-      <div className="grid w-full max-w-[1120px] overflow-hidden rounded-[28px] border border-white bg-white shadow-[0_24px_80px_rgba(5,38,89,0.1)] lg:min-h-[720px] lg:grid-cols-[0.95fr_1.05fr]">
+    <main className={`auth-layout ${pathname === '/login' ? 'auth-layout--login' : ''} ${transitionOut ? 'auth-login--success' : ''} flex min-h-screen items-center justify-center bg-[#FFFFFF] p-4 sm:p-8`}>
+      <div className={`auth-card ${pathname === '/login' ? 'auth-card--login' : ''} grid w-full max-w-[1120px] overflow-hidden rounded-[28px] border border-white bg-white shadow-[0_24px_80px_rgba(5,38,89,0.1)] lg:min-h-[720px] lg:grid-cols-[0.95fr_1.05fr]`}>
         <section className="auth-visual relative hidden flex-col justify-between overflow-hidden bg-[#052659] p-12 text-white lg:flex">
           <div className="pointer-events-none absolute -right-40 top-28 h-[480px] w-[480px] rounded-full border border-[#C2E8FF]/20"/>
           <div className="pointer-events-none absolute -right-24 top-44 h-[350px] w-[350px] rounded-full border border-[#C2E8FF]/20"/>
@@ -37,10 +37,11 @@ export default function AuthLayout({ children }) {
               </div>
             </div>
           </div>
-          <div key={pathname} className="auth-route-transition mx-auto flex w-full max-w-[390px] flex-1 flex-col justify-center py-5">{children}</div>
+          <div key={pathname} className={`auth-route-transition ${pathname === '/login' ? 'auth-login-transition' : ''} mx-auto flex w-full max-w-[390px] flex-1 flex-col justify-center py-5`}>{children}</div>
           <p className="mt-7 text-center text-[11px] text-slate-400">Audit Monitor &middot; {t('Ruang kerja audit yang terorganisir', 'Your organized audit workspace')}</p>
         </section>
       </div>
+      {transitionOut && <div className="auth-exit-curtain" aria-hidden="true" />}
     </main>
   );
 }

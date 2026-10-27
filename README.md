@@ -38,7 +38,7 @@ Vercel serverless functions have a smaller request-body limit than a persistent 
 
 ## Work target lifecycle
 
-Admins assign a target to one registered member with instructions, priority, and a due date. The assigned member updates progress and notes; at 100%, the target is submitted for review. Admins can complete it or request a revision with feedback. Members can attach audit documents to a target and see linked submissions and discussion.
+Admins assign an audit objective to one registered member with instructions, reviewer, start and due dates, priority, and expected evidence. Target details track overall progress plus data collection, analysis, and workpaper progress; members also record audit status, blockers, impact, follow-up, and evidence needs. At 100%, the target is submitted for review. Admins can complete it or request a revision with feedback. The dashboard summarizes audit progress and status distribution. Coaching records are linked to targets and track guidance, follow-up owners, deadlines, status, and next review. The audit guide includes the status and progress definitions from the workbook. Members can attach audit documents to a target and see linked submissions and discussion.
 
 ## API overview
 
@@ -53,6 +53,8 @@ Admins assign a target to one registered member with instructions, priority, and
 | GET | `/api/targets/:id` | Admin or assigned member | View a target and its documents |
 | PATCH | `/api/targets/:id/progress` | Assigned member | Update work progress and notes |
 | PATCH | `/api/targets/:id/review` | Admin | Complete a target or request a revision |
+| GET/POST | `/api/coaching` | Signed in / Admin for POST | List coaching records / record a coaching session |
+| PATCH | `/api/coaching/:id` | Assigned member | Update coaching follow-up status and notes |
 | GET | `/api/submissions` | Admin | List submitted documents |
 | GET | `/api/submissions/mine` | Member | List own documents |
 | POST | `/api/submissions` | Member | Upload a document to Cloudinary, optionally linked to a target |

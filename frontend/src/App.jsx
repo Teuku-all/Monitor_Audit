@@ -15,6 +15,8 @@ import Targets from './pages/Targets';
 import TargetDetail from './pages/TargetDetail';
 import Submissions from './pages/Submissions';
 import Members from './pages/admin/Members';
+import Coaching from './pages/Coaching';
+import AuditGuide from './pages/AuditGuide';
 
 function RootRedirect() {
   const { user, loading, authError, retrySession } = useAuth();
@@ -36,6 +38,8 @@ export default function App() {
       <Route path="/admin/submissions" element={<Submissions />} />
       <Route path="/admin/submissions/:id" element={<AdminDetail />} />
       <Route path="/admin/members" element={<Members />} />
+      <Route path="/admin/coaching" element={<Coaching />} />
+      <Route path="/admin/audit-guide" element={<AuditGuide />} />
     </Route>
     <Route element={<ProtectedRoute role="member"><Workspace /></ProtectedRoute>}>
       <Route path="/member" element={<MemberDashboard />} />
@@ -44,6 +48,8 @@ export default function App() {
       <Route path="/member/submissions" element={<Submissions />} />
       <Route path="/member/upload" element={<MemberUpload />} />
       <Route path="/member/submissions/:id" element={<MemberDetail />} />
+      <Route path="/member/coaching" element={<Coaching />} />
+      <Route path="/member/audit-guide" element={<AuditGuide />} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes></BrowserRouter></AuthProvider></LanguageProvider>;
