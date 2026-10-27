@@ -14,7 +14,8 @@ export default function Register() {
     mismatch: t('Konfirmasi kata sandi belum sama.', 'Your passwords do not match.'),
     name: t('Masukkan nama lengkap Anda.', 'Please enter your full name.'),
     duplicate: t('Email ini sudah terdaftar. Silakan masuk dengan akun Anda.', 'This email is already registered. Please sign in to your account.'),
-    validation: t('Periksa data Anda. Kata sandi harus terdiri dari minimal 8 karakter.', 'Check your details. Your password must contain at least 8 characters.'),
+    validation: t('Periksa data Anda. Kata sandi harus terdiri dari minimal 12 karakter.', 'Check your details. Your password must contain at least 12 characters.'),
+    disabled: t('Pendaftaran publik dinonaktifkan. Hubungi administrator audit.', 'Public registration is disabled. Contact your audit administrator.'),
     connection: t('Belum dapat terhubung ke server. Periksa koneksi dan coba lagi.', 'Unable to reach the server. Check your connection and try again.'),
     failed: t('Akun belum dapat dibuat. Silakan coba lagi.', 'Unable to create your account. Please try again.'),
   };
@@ -31,7 +32,7 @@ export default function Register() {
       setSuccess(true);
       setForm({ name: '', email: '', password: '', confirmPassword: '' });
     } catch (err) {
-      setError(err.response?.status === 409 ? 'duplicate' : err.response?.status === 400 ? 'validation' : err.response ? 'failed' : 'connection');
+      setError(err.response?.data?.code === 'REGISTRATION_DISABLED' ? 'disabled' : err.response?.status === 409 ? 'duplicate' : err.response?.status === 400 ? 'validation' : err.response ? 'failed' : 'connection');
     } finally { setLoading(false); }
   }
 
@@ -48,8 +49,8 @@ export default function Register() {
     </div> : <form onSubmit={handleSubmit} className="mt-7 space-y-4">
       <div><label className="label" htmlFor="register-name">{t('Nama lengkap', 'Full name')}</label><input id="register-name" autoComplete="name" className="input" placeholder={t('Nama lengkap Anda', 'Your full name')} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} maxLength={100} required disabled={loading}/></div>
       <div><label className="label" htmlFor="register-email">{t('Alamat email', 'Email address')}</label><input id="register-email" type="email" autoComplete="email" className="input" placeholder={t('nama@perusahaan.com', 'name@company.com')} value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} maxLength={254} required disabled={loading}/></div>
-      <div><label className="label" htmlFor="register-password">{t('Kata sandi', 'Password')}</label><input id="register-password" type="password" autoComplete="new-password" className="input" placeholder={t('Minimal 8 karakter', 'At least 8 characters')} aria-describedby="password-hint" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} minLength={8} maxLength={128} required disabled={loading}/><p id="password-hint" className="mt-1.5 text-[11px] text-slate-500">{t('Gunakan minimal 8 karakter untuk kata sandi Anda.', 'Use at least 8 characters for your password.')}</p></div>
-      <div><label className="label" htmlFor="register-confirm">{t('Konfirmasi kata sandi', 'Confirm password')}</label><input id="register-confirm" type="password" autoComplete="new-password" className="input" placeholder={t('Ulangi kata sandi', 'Repeat your password')} value={form.confirmPassword} onChange={e => setForm({ ...form, confirmPassword: e.target.value })} minLength={8} maxLength={128} required disabled={loading}/></div>
+      <div><label className="label" htmlFor="register-password">{t('Kata sandi', 'Password')}</label><input id="register-password" type="password" autoComplete="new-password" className="input" placeholder={t('Minimal 12 karakter', 'At least 12 characters')} aria-describedby="password-hint" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} minLength={12} maxLength={72} required disabled={loading}/><p id="password-hint" className="mt-1.5 text-[11px] text-slate-500">{t('Gunakan minimal 12 karakter untuk kata sandi Anda.', 'Use at least 12 characters for your password.')}</p></div>
+      <div><label className="label" htmlFor="register-confirm">{t('Konfirmasi kata sandi', 'Confirm password')}</label><input id="register-confirm" type="password" autoComplete="new-password" className="input" placeholder={t('Ulangi kata sandi', 'Repeat your password')} value={form.confirmPassword} onChange={e => setForm({ ...form, confirmPassword: e.target.value })} minLength={12} maxLength={72} required disabled={loading}/></div>
       <button type="submit" className="btn-primary w-full !py-3" disabled={loading}>{loading ? t('Membuat akun...', 'Creating your account...') : t('Buat akun', 'Create account')}<span aria-hidden="true">&rarr;</span></button>
     </form>}
     <p className="mt-6 border-t border-slate-100 pt-5 text-center text-sm text-slate-500">{t('Sudah punya akun?', 'Already have an account?')} <Link to="/login" className="font-semibold text-[#052659] underline-offset-4 hover:underline">{t('Masuk', 'Sign in')}</Link></p>

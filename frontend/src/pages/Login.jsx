@@ -16,6 +16,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const googleContainer = useRef(null);
   const [googleWidth, setGoogleWidth] = useState(390);
+  const registrationEnabled = import.meta.env.DEV || import.meta.env.VITE_ALLOW_REGISTRATION === 'true';
   useLayoutEffect(() => {
     if (!googleContainer.current) return undefined;
     const measure = () => setGoogleWidth(Math.max(200, Math.floor(googleContainer.current.clientWidth)));
@@ -101,6 +102,6 @@ export default function Login() {
         <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => setError('google')} text="continue_with" shape="rectangular" width={String(googleWidth)}/>
       </div>
     </div>}
-    <p className="mt-8 border-t border-slate-100 pt-6 text-center text-sm text-slate-500">{t('Belum punya akun?', 'New here?')} <Link to="/register" className="font-semibold text-[#052659] underline-offset-4 hover:underline">{t('Buat akun', 'Create an account')}</Link></p>
+    {registrationEnabled && <p className="mt-8 border-t border-slate-100 pt-6 text-center text-sm text-slate-500">{t('Belum punya akun?', 'New here?')} <Link to="/register" className="font-semibold text-[#052659] underline-offset-4 hover:underline">{t('Buat akun', 'Create an account')}</Link></p>}
   </AuthLayout>;
 }

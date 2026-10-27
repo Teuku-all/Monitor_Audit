@@ -1,18 +1,25 @@
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const { db } = require('../config/db');
+const { createToken, setSessionCookie, clearSessionCookie } = require('../utils/session');
 
-function createSession(user) {
-  const token = jwt.sign(
-    { id: user.id, name: user.name, email: user.email, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d', algorithm: 'HS256' },
-  );
-  return { token, user: { id: user.id, name: user.name, email: user.email, role: user.role } };
+function publicRegistrationEnabled() {
+  return process.env.NODE_ENV !== 'production' || process.env.ALLOW_PUBLIC_REGISTRATION === 'true';
+}
+
+function createSession(res, user) {
+  const token = createToken(user);
+  setSessionCookie(res, token);
+  return {
+    ...(process.env.NODE_ENV === 'test' || process.env.ALLOW_BEARER_TOKENS === 'true' ? { token } : {}),
+    user: { id: user.id, name: user.name, email: user.email, role: user.role },
+  };
 }
 
 async function register(req, res) {
+  if (!publicRegistrationEnabled()) {
+    return res.status(403).json({ code: 'REGISTRATION_DISABLED', message: 'Pendaftaran publik dinonaktifkan. Hubungi administrator audit.' });
+  }
   const { name, email, password } = req.body;
   const cleanName = typeof name === 'string' ? name.trim() : '';
   const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
@@ -22,14 +29,14 @@ async function register(req, res) {
   if (cleanEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
     return res.status(400).json({ code: 'INVALID_EMAIL', message: 'Format email tidak valid.' });
   }
-  if (password.length < 8 || Buffer.byteLength(password, 'utf8') > 72) {
-    return res.status(400).json({ code: 'INVALID_PASSWORD', message: 'Password minimal 8 karakter dan maksimal 72 byte.' });
+  if (password.length < 12 || Buffer.byteLength(password, 'utf8') > 72) {
+    return res.status(400).json({ code: 'INVALID_PASSWORD', message: 'Password minimal 12 karakter dan maksimal 72 byte.' });
   }
 
   try {
     const { rows } = await db.query(
       'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id',
-      [cleanName, cleanEmail, bcrypt.hashSync(password, 10), 'member'],
+      [cleanName, cleanEmail, await bcrypt.hash(password, 12), 'member'],
     );
     res.status(201).json({ message: 'Registrasi berhasil.', userId: rows[0].id });
   } catch (error) {
@@ -46,10 +53,14 @@ async function login(req, res) {
   }
   const { rows } = await db.query('SELECT * FROM users WHERE lower(email) = $1', [email]);
   const user = rows[0];
-  if (!user || !user.password || !bcrypt.compareSync(password, user.password)) {
+  const validPassword = user?.password ? await bcrypt.compare(password, user.password) : false;
+  if (!validPassword) {
     return res.status(401).json({ code: 'INVALID_CREDENTIALS', message: 'Email atau password salah.' });
   }
-  res.json({ message: 'Login berhasil.', ...createSession(user) });
+  if (bcrypt.getRounds(user.password) < 12) {
+    await db.query('UPDATE users SET password = $1 WHERE id = $2', [await bcrypt.hash(password, 12), user.id]);
+  }
+  res.json({ message: 'Login berhasil.', ...createSession(res, user) });
 }
 
 async function googleLogin(req, res) {
@@ -88,6 +99,9 @@ async function googleLogin(req, res) {
           [payload.sub, user.id],
         ));
       } else {
+        if (!publicRegistrationEnabled()) {
+          return res.status(403).json({ code: 'REGISTRATION_DISABLED', message: 'Akun belum terdaftar. Hubungi administrator audit.' });
+        }
         ({ rows } = await db.query(
           "INSERT INTO users (name, email, google_sub, role) VALUES ($1, $2, $3, 'member') RETURNING id, name, email, role",
           [payload.name?.trim() || email.split('@')[0], email, payload.sub],
@@ -102,7 +116,12 @@ async function googleLogin(req, res) {
     }
   }
 
-  res.json({ message: 'Login Google berhasil.', ...createSession(user) });
+  res.json({ message: 'Login Google berhasil.', ...createSession(res, user) });
+}
+
+async function logout(req, res) {
+  clearSessionCookie(res);
+  res.status(204).end();
 }
 
 async function getProfile(req, res) {
@@ -111,4 +130,4 @@ async function getProfile(req, res) {
   res.json(rows[0]);
 }
 
-module.exports = { register, login, googleLogin, getProfile };
+module.exports = { register, login, logout, googleLogin, getProfile };

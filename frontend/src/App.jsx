@@ -17,6 +17,7 @@ import Submissions from './pages/Submissions';
 import Members from './pages/admin/Members';
 import Coaching from './pages/Coaching';
 import AuditGuide from './pages/AuditGuide';
+import AuditProgram from './pages/admin/AuditProgram';
 
 function RootRedirect() {
   const { user, loading, authError, retrySession } = useAuth();
@@ -38,6 +39,7 @@ export default function App() {
       <Route path="/admin/submissions" element={<Submissions />} />
       <Route path="/admin/submissions/:id" element={<AdminDetail />} />
       <Route path="/admin/members" element={<Members />} />
+      <Route path="/admin/program" element={<AuditProgram />} />
       <Route path="/admin/coaching" element={<Coaching />} />
       <Route path="/admin/audit-guide" element={<AuditGuide />} />
     </Route>

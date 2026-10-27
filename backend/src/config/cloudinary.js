@@ -18,7 +18,7 @@ async function uploadDocument(file) {
   configureCloudinary();
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder: 'audit-monitor', resource_type: 'auto' },
+      { folder: 'audit-monitor', resource_type: 'auto', type: 'authenticated', access_mode: 'authenticated' },
       (error, result) => {
         if (error) return reject(error);
         if (!result?.secure_url || !result.public_id || !result.resource_type) {
@@ -31,9 +31,20 @@ async function uploadDocument(file) {
   });
 }
 
+function createPrivateDocumentUrl(publicId, resourceType, format) {
+  configureCloudinary();
+  return cloudinary.url(publicId, {
+    resource_type: resourceType,
+    type: 'authenticated',
+    sign_url: true,
+    secure: true,
+    ...(format ? { format } : {}),
+  });
+}
+
 async function deleteDocument(publicId, resourceType) {
   configureCloudinary();
   return cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
 }
 
-module.exports = { uploadDocument, deleteDocument };
+module.exports = { uploadDocument, deleteDocument, createPrivateDocumentUrl };

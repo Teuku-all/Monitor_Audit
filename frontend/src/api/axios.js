@@ -3,27 +3,15 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3001/api' : '/api'),
   timeout: 30000,
+  withCredentials: true,
 });
 
 const isPublicAuth = (url = '') => /\/auth\/(login|register|google)\/?$/.test(url);
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token && !isPublicAuth(config.url)) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
-// Keep invalid-login errors on the form and ignore responses from an old session.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const token = localStorage.getItem('token');
-    if (error.response?.status === 401 && !isPublicAuth(error.config?.url)
-      && token && error.config?.headers?.Authorization === `Bearer ${token}`) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.dispatchEvent(new Event('audit:auth-expired'));
-    }
+    if (error.response?.status === 401 && !isPublicAuth(error.config?.url)) window.dispatchEvent(new Event('audit:auth-expired'));
     return Promise.reject(error);
   }
 );

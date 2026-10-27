@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import StatusBadge from './StatusBadge';
 import Icon from './Icon';
 import { EmptyState } from './States';
+import ScheduleBadge from './ScheduleBadge';
 
 export function ProgressBar({ value = 0 }) {
   return <div className="progress-cell"><div className="progress-track"><span style={{ width: `${value}%` }} /></div><span>{value}%</span></div>;
@@ -40,6 +41,7 @@ export default function TargetTable({ targets, compact = false }) {
         {!compact && <th scope="col">{t('Prioritas', 'Priority')}</th>}
         <th scope="col">{t('Tenggat', 'Due date')}</th>
         <th scope="col">{t('Status pekerjaan / audit', 'Work / audit status')}</th>
+        {!compact && <th scope="col">{t('Jadwal', 'Schedule')}</th>}
         <th scope="col"><span className="sr-only">{t('Buka', 'Open')}</span></th>
       </tr></thead>
       <tbody>{targets.map(item => <tr key={item.id}>
@@ -49,6 +51,7 @@ export default function TargetTable({ targets, compact = false }) {
         {!compact && <td data-label={t('Prioritas', 'Priority')}><Priority value={item.priority} /></td>}
         <td data-label={t('Tenggat', 'Due date')} className={item.due_date < today && !['completed', 'submitted'].includes(item.status) ? 'overdue' : ''}>{formatDate(item.due_date, { day: 'numeric', month: 'short' })}</td>
         <td data-label={t('Status', 'Status')}><StatusBadge status={item.status} /><small className="audit-table-status">{item.audit_status || 'Belum Mulai'}</small></td>
+        {!compact && <td data-label={t('Jadwal', 'Schedule')}><ScheduleBadge status={item.schedule_status}/></td>}
         <td className="table-action"><Link className="table-open" aria-label={`${t('Buka target', 'Open target')}: ${item.title}`} to={`/${admin ? 'admin' : 'member'}/targets/${item.id}`}><Icon name="arrow" size={17} /></Link></td>
       </tr>)}</tbody>
     </table>

@@ -15,32 +15,8 @@ function AnimatedOutlet() {
   const { pathname } = useLocation();
   const homeClass = pathname === '/admin' || pathname === '/member' ? ' home-page-enter' : '';
   const outlet = useOutlet();
-  const previous = useRef({ pathname, outlet });
-  const latestOutlet = useRef(outlet);
-  const [settledPath, setSettledPath] = useState(pathname);
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  latestOutlet.current = outlet;
-
-  useEffect(() => {
-    if (settledPath === pathname) return undefined;
-    const timer = window.setTimeout(() => {
-      previous.current = { pathname, outlet: latestOutlet.current };
-      setSettledPath(pathname);
-    }, reducedMotion ? 0 : 340);
-    return () => window.clearTimeout(timer);
-  }, [pathname, settledPath, reducedMotion]);
-
-  if (settledPath === pathname) {
-    previous.current = { pathname, outlet };
-    return <div className="route-stage"><div key={pathname} className={`page-transition${homeClass}`}>{outlet}</div></div>;
-  }
-
-  if (reducedMotion) return <div className="route-stage"><div key={pathname} className={`page-transition${homeClass}`}>{outlet}</div></div>;
-
-  return <div className="route-stage">
-    <div key={settledPath} className="page-transition route-page-exit" aria-hidden="true" inert="">{previous.current.outlet}</div>
-    <div key={pathname} className={`page-transition route-page-enter${homeClass}`}>{outlet}</div>
-  </div>;
+  return <div className="route-stage"><div key={pathname} className={`page-transition${reducedMotion ? '' : ` route-page-enter${homeClass}`}`}>{outlet}</div></div>;
 }
 
 export default function Layout() {
@@ -58,7 +34,7 @@ export default function Layout() {
     { to: base, end: true, icon: 'grid', label: t('Ringkasan', 'Overview') },
     { to: `${base}/targets`, icon: 'target', label: t('Target kerja', 'Work targets') },
     { to: `${base}/submissions`, icon: 'file', label: t('Dokumen audit', 'Audit documents') },
-    ...(admin ? [{ to: '/admin/members', icon: 'users', label: t('Anggota tim', 'Team members') }] : [{ to: '/member/upload', icon: 'upload', label: t('Kirim dokumen', 'Upload document') }]),
+    ...(admin ? [{ to: '/admin/program', icon: 'target', label: t('Program audit', 'Audit program') }, { to: '/admin/members', icon: 'users', label: t('Anggota tim', 'Team members') }] : [{ to: '/member/upload', icon: 'upload', label: t('Kirim dokumen', 'Upload document') }]),
     { to: `${base}/coaching`, icon: 'message', label: t('Coaching', 'Coaching') },
     { to: `${base}/audit-guide`, icon: 'file', label: t('Panduan audit', 'Audit guide') },
   ];

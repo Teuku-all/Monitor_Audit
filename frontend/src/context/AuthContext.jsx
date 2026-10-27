@@ -4,7 +4,7 @@ import api from '../api/axios';
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  // Verify the role with the server instead of trusting localStorage.
+  // The server verifies the HttpOnly session cookie and returns the current role.
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(false);
@@ -23,30 +23,21 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      localStorage.removeItem('user');
-      setLoading(false);
-      return;
-    }
     const controller = new AbortController();
     const requestGeneration = generation.current;
     setLoading(true);
     setAuthError(false);
     api.get('/auth/profile', { signal: controller.signal })
       .then(({ data }) => {
-        if (generation.current !== requestGeneration || localStorage.getItem('token') !== token) return;
+        if (generation.current !== requestGeneration) return;
         setUser(data);
-        localStorage.setItem('user', JSON.stringify(data));
       })
       .catch((error) => {
         if (controller.signal.aborted || generation.current !== requestGeneration) return;
         if (error.response?.status === 401) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
           setUser(null);
         } else {
-          // Keep the token during connection failures to allow retrying.
+          // Keep the current session during temporary connection failures.
           setAuthError(true);
         }
       })
@@ -59,8 +50,6 @@ export function AuthProvider({ children }) {
   async function login(email, password) {
     const { data } = await api.post('/auth/login', { email: email.trim(), password });
     generation.current += 1;
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('user', JSON.stringify(data.user));
     setUser(data.user);
     setAuthError(false);
     setLoading(false);
@@ -70,18 +59,15 @@ export function AuthProvider({ children }) {
   async function loginWithGoogle(credential) {
     const { data } = await api.post('/auth/google', { credential });
     generation.current += 1;
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('user', JSON.stringify(data.user));
     setUser(data.user);
     setAuthError(false);
     setLoading(false);
     return data.user;
   }
 
-  function logout() {
+  async function logout() {
     generation.current += 1;
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    try { await api.post('/auth/logout'); } catch { /* Clear local state even if the network is unavailable. */ }
     setUser(null);
     setLoading(false);
     setAuthError(false);

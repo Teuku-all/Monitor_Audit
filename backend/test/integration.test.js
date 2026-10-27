@@ -97,6 +97,15 @@ function documentForm(targetId, fileName = 'audit.pdf') {
   return form;
 }
 
+function disguisedDocumentForm(targetId) {
+  const form = new FormData();
+  form.set('title', 'Disguised executable');
+  form.set('description', 'This must be rejected before storage.');
+  form.set('target_id', String(targetId));
+  form.set('file', new Blob(['MZ-not-a-pdf'], { type: 'application/pdf' }), 'disguised.pdf');
+  return form;
+}
+
 test('PostgreSQL routes retain auth, permissions, targets, uploads, and discussions', async t => {
   t.after(async () => {
     if (server) await new Promise(resolve => server.close(resolve));
@@ -246,6 +255,13 @@ test('PostgreSQL routes retain auth, permissions, targets, uploads, and discussi
     method: 'POST',
     multipart: documentForm(targetId),
   })).status, 403);
+  const disguisedUpload = await request('/submissions', {
+    token: owner.token,
+    method: 'POST',
+    multipart: disguisedDocumentForm(targetId),
+  });
+  assert.equal(disguisedUpload.status, 400);
+  assert.equal(disguisedUpload.data.code, 'INVALID_FILE_CONTENT');
 
   const unicodeFilename = 'Dokumen pemeriksaan.pdf';
   const uploaded = await request('/submissions', {
@@ -257,7 +273,9 @@ test('PostgreSQL routes retain auth, permissions, targets, uploads, and discussi
   const submissionId = uploaded.data.id;
   const detail = await request(`/submissions/${submissionId}`, { token: admin.token });
   assert.equal(detail.data.file_name, unicodeFilename);
-  assert.match(detail.data.file_path, /^https:\/\/cloudinary\.test\//);
+  assert.equal(detail.data.file_url, `/api/submissions/${submissionId}/file`);
+  assert.equal(detail.data.file_path, undefined);
+  assert.equal(detail.data.file_public_id, undefined);
 
   const comment = await request(`/comments/${submissionId}`, {
     token: admin.token,
@@ -315,7 +333,12 @@ test('PostgreSQL routes retain auth, permissions, targets, uploads, and discussi
   const complete = await request(`/targets/${targetId}/review`, {
     token: admin.token,
     method: 'PATCH',
-    body: { status: 'completed', feedback: 'Approved.' },
+    body: {
+      status: 'completed', feedback: 'Approved.',
+      quality_procedure_followed: true,
+      quality_evidence_sufficient: true,
+      quality_conclusion_reviewed: true,
+    },
   });
   assert.equal(complete.data.status, 'completed');
   assert.equal((await request(`/targets/${targetId}/progress`, {

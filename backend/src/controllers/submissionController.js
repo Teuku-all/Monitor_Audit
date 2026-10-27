@@ -1,10 +1,16 @@
 const { db } = require('../config/db');
-const { uploadDocument, deleteDocument } = require('../config/cloudinary');
+const { uploadDocument, deleteDocument, createPrivateDocumentUrl } = require('../config/cloudinary');
 const { getCommentsForSubmission } = require('./commentController');
 const { normalizeFilename } = require('../utils/normalizeFilename');
 
 function normalizeSubmission(submission) {
-  return { ...submission, file_name: normalizeFilename(submission.file_name) };
+  const { file_path, file_public_id, file_resource_type, file_format, ...safe } = submission;
+  return { ...safe, file_name: normalizeFilename(submission.file_name), file_url: `/api/submissions/${submission.id}/file` };
+}
+
+function validId(value) {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
 }
 
 async function getAllSubmissions(req, res) {
@@ -36,19 +42,54 @@ async function getMySubmissions(req, res) {
 }
 
 async function getSubmissionById(req, res) {
+  const submissionId = validId(req.params.id);
+  if (!submissionId) return res.status(400).json({ code: 'INVALID_ID', message: 'ID dokumen tidak valid.' });
   const { rows } = await db.query(`
     SELECT s.*, u.name AS member_name, u.email AS member_email
     FROM submissions s
     JOIN users u ON s.member_id = u.id
     WHERE s.id = $1
-  `, [req.params.id]);
+  `, [submissionId]);
   const submission = rows[0];
   if (!submission) return res.status(404).json({ message: 'Submission tidak ditemukan.' });
   if (req.user.role === 'member' && submission.member_id !== req.user.id) {
     return res.status(403).json({ message: 'Akses ditolak.' });
   }
-  const comments = await getCommentsForSubmission(req.params.id);
+  const comments = await getCommentsForSubmission(submissionId);
   res.json({ ...normalizeSubmission(submission), comments });
+}
+
+async function downloadSubmission(req, res) {
+  const submissionId = validId(req.params.id);
+  if (!submissionId) return res.status(400).json({ code: 'INVALID_ID', message: 'ID dokumen tidak valid.' });
+  const { rows } = await db.query(
+    'SELECT id, member_id, file_path, file_name, file_public_id, file_resource_type, file_format FROM submissions WHERE id = $1',
+    [submissionId],
+  );
+  const submission = rows[0];
+  if (!submission) return res.status(404).json({ message: 'Dokumen tidak ditemukan.' });
+  if (req.user.role === 'member' && submission.member_id !== req.user.id) return res.status(403).json({ message: 'Akses ditolak.' });
+
+  const sourceUrl = submission.file_public_id
+    ? createPrivateDocumentUrl(submission.file_public_id, submission.file_resource_type || 'raw', submission.file_format)
+    : submission.file_path;
+  let parsed;
+  try { parsed = new URL(sourceUrl); } catch { return res.status(502).json({ message: 'Lokasi dokumen tidak valid.' }); }
+  if (parsed.protocol !== 'https:' || parsed.hostname !== 'res.cloudinary.com') {
+    return res.status(502).json({ message: 'Penyedia dokumen tidak valid.' });
+  }
+  const upstream = await fetch(sourceUrl, { redirect: 'error', signal: AbortSignal.timeout(20000) });
+  if (!upstream.ok) return res.status(502).json({ message: 'Dokumen belum dapat diambil dari penyimpanan.' });
+  const content = Buffer.from(await upstream.arrayBuffer());
+  const safeName = normalizeFilename(submission.file_name).replace(/[\r\n"\\]/g, '_');
+  res.set({
+    'Content-Type': upstream.headers.get('content-type') || 'application/octet-stream',
+    'Content-Length': String(content.length),
+    'Content-Disposition': `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(safeName)}`,
+    'X-Content-Type-Options': 'nosniff',
+    'Cache-Control': 'private, no-store, max-age=0',
+  });
+  return res.send(content);
 }
 
 async function createSubmission(req, res) {
@@ -73,8 +114,8 @@ async function createSubmission(req, res) {
   const uploaded = await uploadDocument(req.file);
   try {
     const { rows } = await db.query(`
-      INSERT INTO submissions (member_id, title, description, file_path, file_name, target_id)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO submissions (member_id, title, description, file_path, file_name, target_id, file_public_id, file_resource_type, file_format)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING id
     `, [
       req.user.id,
@@ -83,6 +124,9 @@ async function createSubmission(req, res) {
       uploaded.secure_url,
       normalizeFilename(req.file.originalname),
       targetId,
+      uploaded.public_id,
+      uploaded.resource_type,
+      uploaded.format || null,
     ]);
     res.status(201).json({ message: 'Submission berhasil diunggah.', id: rows[0].id });
   } catch (error) {
@@ -143,6 +187,7 @@ module.exports = {
   getAllSubmissions,
   getMySubmissions,
   getSubmissionById,
+  downloadSubmission,
   createSubmission,
   updateStatus,
   getStats,
