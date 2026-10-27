@@ -1,11 +1,11 @@
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const express = require('express');
 const cors = require('cors');
 const { initDB } = require('./src/config/db');
 const { securityHeaders, apiLimiter, noStore } = require('./src/middleware/security');
 
-if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is required. Copy backend/.env.example to backend/.env and set a secret.');
+if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is required. Copy .env.example to .env and set a secret.');
 if (process.env.NODE_ENV === 'production' && process.env.JWT_SECRET.length < 32) throw new Error('JWT_SECRET must contain at least 32 characters in production.');
 if (process.env.NODE_ENV === 'production' && process.env.ADMIN_PASSWORD
   && (process.env.ADMIN_PASSWORD.length < 12 || Buffer.byteLength(process.env.ADMIN_PASSWORD, 'utf8') > 72)) {

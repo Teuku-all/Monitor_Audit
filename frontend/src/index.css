@@ -1236,6 +1236,8 @@ html[data-theme="dark"] .auth-card--login .auth-login-transition>p:last-of-type{
 .schedule-badge i{width:7px;height:7px;border-radius:50%;background:currentColor;}
 .schedule-yellow{background:#FEF3C7;color:#92400E;}
 .schedule-red{background:#FEE2E2;color:#991B1B;}
+.google-login-unavailable{display:flex;min-height:42px;align-items:center;justify-content:center;border:1px solid #DBEAFE;border-radius:8px;background:#F8FAFC;padding:10px 14px;color:#64748B;text-align:center;font-size:12px;line-height:1.5;}
+html[data-theme="dark"] .google-login-unavailable{border-color:#334155;background:#111827;color:#CBD5E1;}
 .audit-program-page>.section-space{margin-bottom:18px;}
 .program-form{display:grid;gap:16px;}
 .program-tabs{display:flex;gap:9px;overflow:auto;margin:0 0 18px;padding:2px 2px 8px;}

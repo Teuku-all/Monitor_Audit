@@ -18,6 +18,7 @@ import Members from './pages/admin/Members';
 import Coaching from './pages/Coaching';
 import AuditGuide from './pages/AuditGuide';
 import AuditProgram from './pages/admin/AuditProgram';
+import { googleClientId } from './utils/googleOAuth';
 
 function RootRedirect() {
   const { user, loading, authError, retrySession } = useAuth();
@@ -55,6 +56,5 @@ export default function App() {
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes></BrowserRouter></AuthProvider></LanguageProvider>;
-  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   return googleClientId ? <GoogleOAuthProvider clientId={googleClientId}>{app}</GoogleOAuthProvider> : app;
 }

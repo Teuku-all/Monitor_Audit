@@ -4,6 +4,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import AuthLayout from '../components/AuthLayout';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { googleClientId } from '../utils/googleOAuth';
 
 export default function Login() {
   const { login, loginWithGoogle } = useAuth();
@@ -34,6 +35,8 @@ export default function Login() {
     connection: t('Belum dapat terhubung ke server. Periksa koneksi dan coba lagi.', 'Unable to reach the server. Check your connection and try again.'),
     failed: t('Belum dapat masuk. Silakan coba lagi sebentar.', 'Unable to sign in. Please try again shortly.'),
     google: t('Login Google gagal. Silakan coba lagi.', 'Google sign-in failed. Please try again.'),
+    googleConfig: t('Login Google belum dikonfigurasi. Hubungi administrator.', 'Google sign-in is not configured. Contact your administrator.'),
+    googleAccount: t('Akun Google ini belum terdaftar. Hubungi administrator untuk akses.', 'This Google account is not registered. Contact your administrator for access.'),
   };
 
   async function completeSignIn(user, startedAt) {
@@ -79,8 +82,9 @@ export default function Login() {
       const user = await loginWithGoogle(response.credential);
       succeeded = true;
       await completeSignIn(user, startedAt);
-    } catch {
-      setError('google');
+    } catch (err) {
+      const code = err.response?.data?.code;
+      setError(code === 'GOOGLE_LOGIN_UNAVAILABLE' ? 'googleConfig' : code === 'REGISTRATION_DISABLED' ? 'googleAccount' : 'google');
     } finally {
       if (!succeeded) setLoading(false);
     }
@@ -96,12 +100,12 @@ export default function Login() {
       <div><div className="mb-2 flex items-center justify-between gap-3"><label className="label !mb-0" htmlFor="login-password">{t('Kata sandi', 'Password')}</label><button type="button" onClick={() => setShowPassword(value => !value)} aria-pressed={showPassword} className="text-xs font-medium text-[#052659] hover:text-[#052659]">{showPassword ? t('Sembunyikan', 'Hide') : t('Tampilkan', 'Show')}</button></div><input id="login-password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" className="input" placeholder={t('Masukkan kata sandi', 'Enter your password')} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required disabled={loading}/></div>
       <button type="submit" className={`btn-primary login-submit w-full !py-3 ${loading ? 'is-loading' : ''}`} disabled={loading}><span className="login-submit-label">{loading ? t('Memeriksa akun...', 'Signing in...') : t('Masuk', 'Sign in')}</span><span className="login-submit-arrow" aria-hidden="true">&rarr;</span><span className="login-submit-spinner" aria-hidden="true" /></button>
     </form>
-    {import.meta.env.VITE_GOOGLE_CLIENT_ID && <div className="mt-6">
+    <div className="mt-6">
       <div className="mb-5 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200"/>{t('atau lanjutkan dengan', 'or continue with')}<span className="h-px flex-1 bg-slate-200"/></div>
-      <div ref={googleContainer} className={`google-login-container ${loading ? 'pointer-events-none opacity-60' : ''}`}>
+      {googleClientId ? <div ref={googleContainer} className={`google-login-container ${loading ? 'pointer-events-none opacity-60' : ''}`}>
         <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => setError('google')} text="continue_with" shape="rectangular" width={String(googleWidth)}/>
-      </div>
-    </div>}
+      </div> : <p className="google-login-unavailable" role="status">{t('Login dengan Google belum tersedia. Silakan hubungi administrator.', 'Google sign-in is unavailable. Please contact your administrator.')}</p>}
+    </div>
     {registrationEnabled && <p className="mt-8 border-t border-slate-100 pt-6 text-center text-sm text-slate-500">{t('Belum punya akun?', 'New here?')} <Link to="/register" className="font-semibold text-[#052659] underline-offset-4 hover:underline">{t('Buat akun', 'Create an account')}</Link></p>}
   </AuthLayout>;
 }

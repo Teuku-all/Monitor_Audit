@@ -6,13 +6,13 @@ Audit Monitor is a bilingual (Indonesian and English) workspace for audit teams.
 
 Requirements: Node.js 20+ and npm.
 
-1. Copy `backend/.env.example` to `backend/.env` and `frontend/.env.example` to `frontend/.env`.
-2. Create a Neon project and set its PostgreSQL connection string as `DATABASE_URL` in `backend/.env`.
-3. Create a Google OAuth 2.0 Web client ID. Add the local frontend origin (`http://localhost:5173`) to its authorized JavaScript origins. Set the same client ID in `backend/.env` (`GOOGLE_CLIENT_ID`) and `frontend/.env` (`VITE_GOOGLE_CLIENT_ID`).
-4. Create a Cloudinary account and set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` in `backend/.env`.
+1. Copy the root `.env.example` to a single root `.env`. Both frontend and backend read configuration from this file; keep `.env` private and do not commit it.
+2. Create a Neon project and set its PostgreSQL connection string as `DATABASE_URL` in the root `.env`.
+3. Create a Google OAuth 2.0 Web client ID. Add the local frontend origin (`http://localhost:5173`) to its authorized JavaScript origins. Set the same client ID in `GOOGLE_CLIENT_ID` and `VITE_GOOGLE_CLIENT_ID` in the root `.env`.
+4. Create a Cloudinary account and set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` in the root `.env`.
 5. Set a random `JWT_SECRET` of at least 32 characters and set a password of at least 12 characters in `ADMIN_PASSWORD` for the initial administrator.
 6. In `backend/`, run `npm install` and then `npm run dev`.
-7. Set `VITE_API_URL=http://localhost:3001/api`, then run `npm install` and `npm run dev` in `frontend/`.
+7. Set `VITE_API_URL=http://localhost:3001/api` in the root `.env`, then run `npm install` and `npm run dev` in `frontend/`.
 8. Open `http://localhost:5173`.
 
 The backend creates or updates the required tables in Neon at startup. Existing SQLite data is not automatically migrated; migrate existing accounts and submissions before switching a deployment to Neon. New document uploads are stored as authenticated Cloudinary assets and are downloaded only through an authorized API endpoint.
@@ -24,7 +24,7 @@ Set both `ADMIN_EMAIL` and `ADMIN_PASSWORD` before deploying. The development-on
 The repository is configured as one Vercel project: Vercel builds the Vite frontend and routes `/api/*` to the Express serverless function in `api/index.js`.
 
 1. Import this repository into Vercel and leave the project root directory set to the repository root. The included `vercel.json` configures install, build, output, API routing, and SPA fallback.
-2. Add these backend environment variables in Vercel for each environment you deploy:
+2. Add these backend environment variables in Vercel for each environment you deploy (Vercel does not load the local root `.env` file):
    - `DATABASE_URL` (Neon connection string)
    - `JWT_SECRET` (random value of at least 32 characters)
    - `SESSION_HOURS` (optional, defaults to 4 and accepts 1–24)
