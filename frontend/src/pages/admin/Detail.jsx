@@ -73,7 +73,6 @@ export default function AdminDetail() {
 
   return (
     <div className="space-y-6">
-      <Link to="/admin" className="back-link"><span aria-hidden="true">&larr;</span>{t('Kembali ke dasbor', 'Back to dashboard')}</Link>
       <div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#052659]">{t('Peninjauan dokumen', 'Document review')}</p><h1 className="page-title break-words">{data.title}</h1><p className="page-subtitle">{t('Dikirim oleh', 'Submitted by')} {data.member_name} &middot; {formatDate(data.submitted_at, { dateStyle: 'long' })}</p></div>
       {notice && <div role={notice.endsWith('Error') ? 'alert' : 'status'} className={`alert ${notice.endsWith('Error') ? 'alert-error' : 'border border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{messages[notice]}</div>}
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">

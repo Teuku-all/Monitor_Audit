@@ -41,7 +41,7 @@ export default function AuthLayout({ children, transitionOut = false }) {
           <p className="mt-7 text-center text-[11px] text-slate-400">Audit Monitor &middot; {t('Ruang kerja audit yang terorganisir', 'Your organized audit workspace')}</p>
         </section>
       </div>
-      {transitionOut && <div className="auth-exit-curtain" aria-hidden="true" />}
+      {transitionOut && <div className="auth-exit-curtain" aria-hidden="true"><span className="transition-curtain-surface" /><div className="transition-brand"><BrandMark size={92} /><strong>Audit Monitoring</strong></div></div>}
     </main>
   );
 }

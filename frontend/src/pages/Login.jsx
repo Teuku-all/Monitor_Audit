@@ -43,7 +43,7 @@ export default function Login() {
     }
     setTransitionOut(true);
     if (!reducedMotion) {
-      await new Promise(resolve => window.setTimeout(resolve, 900));
+      await new Promise(resolve => window.setTimeout(resolve, 1100));
     }
     navigate(user.role === 'admin' ? '/admin' : '/member', { replace: true });
   }

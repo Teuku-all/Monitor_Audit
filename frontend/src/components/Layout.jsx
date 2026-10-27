@@ -83,13 +83,7 @@ export default function Layout() {
   }, [open]);
 
   useEffect(() => {
-    if (!showHomeCurtain) return undefined;
-    if (pathname !== base) {
-      setShowHomeCurtain(false);
-      return undefined;
-    }
-    const timer = window.setTimeout(() => setShowHomeCurtain(false), 1100);
-    return () => window.clearTimeout(timer);
+    if (showHomeCurtain && pathname !== base) setShowHomeCurtain(false);
   }, [pathname, base, showHomeCurtain]);
 
   function closeMenu() {
@@ -117,5 +111,5 @@ export default function Layout() {
       <main className="workspace-content"><AnimatedOutlet /></main>
       <footer className="workspace-footer"><span>Audit Monitor</span><span>{t('Setiap progres, tercatat.', 'Every step, accounted for.')}</span></footer>
     </div>
-  </div>{showHomeCurtain && <div className="home-entry-curtain" aria-hidden="true" />}</>;
+  </div>{showHomeCurtain && <div className="home-entry-curtain" aria-hidden="true"><span className="transition-curtain-surface" onAnimationEnd={() => setShowHomeCurtain(false)} /><div className="transition-brand"><BrandMark size={92} /><strong>Audit Monitoring</strong></div></div>}</>;
 }

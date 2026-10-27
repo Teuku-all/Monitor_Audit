@@ -57,7 +57,6 @@ export default function MemberDetail() {
 
   return (
     <div className="mx-auto max-w-[920px] space-y-6">
-      <Link to="/member" className="back-link"><span aria-hidden="true">&larr;</span>{t('Kembali ke dasbor', 'Back to dashboard')}</Link>
       <div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#052659]">{t('Dokumen saya', 'My document')}</p><h1 className="page-title break-words">{data.title}</h1><p className="page-subtitle">{t('Dikirim pada', 'Submitted on')} {formatDate(data.submitted_at, { dateStyle: 'long' })}</p></div>
       <section className="panel p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold text-[#052659]">{t('Detail dokumen', 'Document details')}</h2><StatusBadge status={data.status}/></div>
