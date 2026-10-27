@@ -1,5 +1,6 @@
 const { db } = require('../config/db');
 const { readSessionCookie, verifyToken } = require('../utils/session');
+const { isAllowedOrigin } = require('./security');
 
 async function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -16,7 +17,7 @@ async function authenticate(req, res, next) {
   if (!bearer && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
     const origin = req.get('origin');
     const allowedOrigins = req.app.locals.allowedOrigins || [];
-    if (!origin || !allowedOrigins.includes(origin)) {
+    if (!isAllowedOrigin(req, origin, allowedOrigins)) {
       return res.status(403).json({ code: 'INVALID_ORIGIN', message: 'Permintaan tidak berasal dari aplikasi yang diizinkan.' });
     }
   }

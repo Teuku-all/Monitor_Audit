@@ -32,6 +32,20 @@ const authLimiter = rateLimit({
   message: { code: 'AUTH_RATE_LIMITED', message: 'Terlalu banyak percobaan masuk. Coba lagi dalam 15 menit.' },
 });
 
+function isAllowedOrigin(req, origin, allowedOrigins = []) {
+  if (!origin) return false;
+  if (allowedOrigins.includes(origin)) return true;
+  try {
+    const candidate = new URL(origin);
+    const requestHost = (req.get('x-forwarded-host') || req.get('host') || '').split(',')[0].trim();
+    const requestProtocol = (req.get('x-forwarded-proto') || req.protocol || '').split(',')[0].trim().replace(/:$/, '');
+    return candidate.host.toLowerCase() === requestHost.toLowerCase()
+      && candidate.protocol === `${requestProtocol}:`;
+  } catch {
+    return false;
+  }
+}
+
 const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: 30,
@@ -45,4 +59,4 @@ function noStore(req, res, next) {
   next();
 }
 
-module.exports = { securityHeaders, apiLimiter, authLimiter, uploadLimiter, noStore };
+module.exports = { securityHeaders, apiLimiter, authLimiter, uploadLimiter, noStore, isAllowedOrigin };

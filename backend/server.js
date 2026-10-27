@@ -3,7 +3,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const express = require('express');
 const cors = require('cors');
 const { initDB } = require('./src/config/db');
-const { securityHeaders, apiLimiter, noStore } = require('./src/middleware/security');
+const { securityHeaders, apiLimiter, noStore, isAllowedOrigin } = require('./src/middleware/security');
 
 if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is required. Copy .env.example to .env and set a secret.');
 if (process.env.NODE_ENV === 'production' && process.env.JWT_SECRET.length < 32) throw new Error('JWT_SECRET must contain at least 32 characters in production.');
@@ -29,13 +29,13 @@ const origins = [
 ].map(value => value.trim()).filter(Boolean);
 app.locals.allowedOrigins = origins;
 app.use(securityHeaders);
-app.use(cors({
+app.use((req, res, next) => cors({
   origin(origin, callback) {
-    if (!origin || origins.includes(origin)) return callback(null, true);
+    if (!origin || isAllowedOrigin(req, origin, origins)) return callback(null, true);
     const error = new Error('Origin tidak diizinkan.'); error.status = 403; callback(error);
   },
   credentials: true,
-}));
+})(req, res, next));
 app.use(noStore);
 app.use('/api', apiLimiter);
 app.use(express.json({ limit: '1mb' }));
