@@ -28,8 +28,6 @@ export default function Layout() {
   const closeButton = useRef(null);
   const admin = user?.role === 'admin';
   const base = admin ? '/admin' : '/member';
-  const enteredOnHome = useRef(pathname === base);
-  const [showHomeCurtain, setShowHomeCurtain] = useState(() => enteredOnHome.current && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
   const items = [
     { to: base, end: true, icon: 'grid', label: t('Ringkasan', 'Overview') },
     { to: `${base}/targets`, icon: 'target', label: t('Target kerja', 'Work targets') },
@@ -58,10 +56,6 @@ export default function Layout() {
     };
   }, [open]);
 
-  useEffect(() => {
-    if (showHomeCurtain && pathname !== base) setShowHomeCurtain(false);
-  }, [pathname, base, showHomeCurtain]);
-
   function closeMenu() {
     setOpen(false);
     menuButton.current?.focus();
@@ -71,7 +65,7 @@ export default function Layout() {
     {open && <button className="sidebar-overlay" aria-label={t('Tutup navigasi', 'Close navigation')} onClick={closeMenu} />}
     <aside id="mobile-navigation" className={`sidebar ${open ? 'is-open' : ''}`} aria-label={t('Menu navigasi', 'Navigation menu')}>
       <div className="sidebar-heading">
-        <NavLink to={base} className="brand" onClick={() => setOpen(false)}><span className="brand-symbol"><BrandMark size={42} /></span><span>Audit<span className="brand-light">Monitor</span><small>TEAM WORKSPACE</small></span></NavLink>
+        <NavLink to={base} className="brand" onClick={() => setOpen(false)}><span className="brand-symbol"><BrandMark size={42} /></span><span className="brand-copy">SIGAP<small className="brand-description">Sistem Informasi Gerak Audit Progresif</small></span></NavLink>
         <button ref={closeButton} className="sidebar-close" type="button" aria-label={t('Tutup menu', 'Close menu')} onClick={closeMenu}><Icon name="close" size={19} /></button>
       </div>
       <div className="sidebar-caption">{t('Menu utama', 'Main menu')}</div>
@@ -85,7 +79,7 @@ export default function Layout() {
         <div className="header-actions"><span className="header-date"><span className="header-date-icon"><Icon name="calendar" size={16} /></span><span className="header-date-copy"><small>{t('Hari ini', 'Today')}</small><strong>{formatDate(new Date(), { day: 'numeric', month: 'short', year: 'numeric' })}</strong></span></span><ThemeToggle /><LanguageSwitch /></div>
       </header>
       <main className="workspace-content"><AnimatedOutlet /></main>
-      <footer className="workspace-footer"><span>Audit Monitor</span><span>{t('Setiap progres, tercatat.', 'Every step, accounted for.')}</span></footer>
+      <footer className="workspace-footer"><span>SIGAP &middot; Sistem Informasi Gerak Audit Progresif</span><span>{t('Setiap progres, tercatat.', 'Every step, accounted for.')}</span></footer>
     </div>
-  </div>{showHomeCurtain && <div className="home-entry-curtain" aria-hidden="true"><span className="transition-curtain-surface" onAnimationEnd={() => setShowHomeCurtain(false)} /><div className="transition-brand"><BrandMark size={92} /><strong>Audit Monitoring</strong></div></div>}</>;
+  </div></>;
 }

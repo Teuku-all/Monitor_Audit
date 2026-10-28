@@ -1,6 +1,6 @@
-# Audit Monitor
+# SIGAP
 
-Audit Monitor is a bilingual (Indonesian and English) workspace for audit teams. Admins review submissions, discuss comments with members, assign work targets, and track progress. Members can register, sign in with Google, update assigned work, and submit documents for review.
+SIGAP (Sistem Informasi Gerak Audit Progresif) is a bilingual (Indonesian and English) workspace for audit teams. Admins review submissions, discuss comments with members, assign work targets, and track progress. Members can register, sign in with Google, update assigned work, and submit documents for review.
 
 ## Run locally
 
@@ -41,6 +41,8 @@ Vercel serverless functions have a smaller request-body limit than a persistent 
 ## Work target lifecycle
 
 Admins assign an audit objective to one registered member with instructions, reviewer, start and due dates, priority, and expected evidence. Target details track overall progress plus data collection, analysis, and workpaper progress; members also record audit status, blockers, impact, follow-up, and evidence needs. At 100%, the target is submitted for review. Admins can complete it or request a revision with feedback. The dashboard summarizes audit progress and status distribution. Coaching records are linked to targets and track guidance, follow-up owners, deadlines, status, and next review. The audit guide includes the status and progress definitions from the workbook. Members can attach audit documents to a target and see linked submissions and discussion.
+
+The target form accepts a manually typed audit title and audit objective. Selecting an existing audit title from the suggestions links the objective to its program and fills its dates. Custom titles are saved independently and can be grouped into a program later. Startup automatically adds the optional `targets.audit_title` column to existing databases.
 
 ## API overview
 

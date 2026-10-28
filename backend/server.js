@@ -47,7 +47,7 @@ app.use('/api/coaching', require('./src/routes/coaching'));
 app.use('/api/targets', require('./src/routes/targets'));
 app.use('/api/engagements', require('./src/routes/engagements'));
 app.use('/api/users', require('./src/routes/users'));
-app.get('/', (req, res) => res.json({ status: 'Audit Monitor API running', version: '1.1.0' }));
+app.get('/', (req, res) => res.json({ status: 'SIGAP API running', version: '1.1.0' }));
 app.use('/api', (req, res) => res.status(404).json({ code: 'NOT_FOUND', message: 'Endpoint tidak ditemukan.' }));
 app.use((error, req, res, next) => {
   if (res.headersSent) return next(error);

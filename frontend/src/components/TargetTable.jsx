@@ -35,7 +35,7 @@ export default function TargetTable({ targets, compact = false }) {
   return <div className="table-scroll" role="region" aria-label={t('Tabel sasaran audit', 'Audit objectives table')} tabIndex={0}>
     <table className="data-table responsive-table">
       <thead><tr>
-        <th scope="col">{t('Target', 'Target')}</th>
+        <th scope="col">{t('Sasaran audit', 'Audit objective')}</th>
         {admin && <th scope="col">{t('Ditugaskan ke', 'Assigned to')}</th>}
         <th scope="col">{t('Progres', 'Progress')}</th>
         {!compact && <th scope="col">{t('Prioritas', 'Priority')}</th>}
@@ -45,7 +45,7 @@ export default function TargetTable({ targets, compact = false }) {
         <th scope="col"><span className="sr-only">{t('Buka', 'Open')}</span></th>
       </tr></thead>
       <tbody>{targets.map(item => <tr key={item.id}>
-        <td data-label={t('Target', 'Target')}><Link className="table-title" to={`/${admin ? 'admin' : 'member'}/targets/${item.id}`}>{item.title}</Link><small>#{String(item.id).padStart(3, '0')}</small></td>
+        <td data-label={t('Sasaran audit', 'Audit objective')}><Link className="table-title" to={`/${admin ? 'admin' : 'member'}/targets/${item.id}`}>{item.title}</Link>{(item.engagement_title || item.audit_title) && <small>{item.engagement_title || item.audit_title}</small>}<small>#{String(item.id).padStart(3, '0')}</small></td>
         {admin && <td data-label={t('Ditugaskan ke', 'Assigned to')}><span className="person-cell"><span className="avatar avatar-small">{item.assigned_name?.charAt(0)}</span>{item.assigned_name}</span></td>}
         <td data-label={t('Progres', 'Progress')}><ProgressBar value={item.progress} /></td>
         {!compact && <td data-label={t('Prioritas', 'Priority')}><Priority value={item.priority} /></td>}

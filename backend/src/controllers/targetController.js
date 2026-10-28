@@ -1,10 +1,10 @@
 const { db } = require('../config/db');
 const { normalizeFilename } = require('../utils/normalizeFilename');
-const { validDate, withScheduleStatus } = require('../utils/auditDates');
+const { validDate, dateOnly, withScheduleStatus } = require('../utils/auditDates');
 const STATUSES = ['assigned', 'in_progress', 'submitted', 'completed', 'revision'];
 const AUDIT_STATUSES = ['Belum Mulai', 'Berjalan', 'Menunggu Data', 'Terhambat', 'Review Ketua Tim', 'Selesai'];
 const SELECT_TARGET = `SELECT t.*, u.name AS assigned_name, u.email AS assigned_email, a.name AS created_by_name,
-  e.title AS engagement_title, e.program_id
+  COALESCE(e.title, CASE WHEN t.audit_title = '' THEN NULL ELSE t.audit_title END) AS engagement_title, e.program_id
   FROM targets t JOIN users u ON u.id = t.assigned_to JOIN users a ON a.id = t.created_by
   LEFT JOIN audit_engagements e ON e.id = t.engagement_id`;
 
@@ -60,7 +60,9 @@ async function createTarget(req, res) {
   const evidenceNeeded = typeof req.body.evidence_needed === 'string' ? req.body.evidence_needed.trim() : '';
   const title = typeof req.body.title === 'string' ? req.body.title.trim() : '';
   const description = typeof req.body.description === 'string' ? req.body.description.trim() : '';
+  const auditTitle = typeof req.body.audit_title === 'string' ? req.body.audit_title.trim() : '';
   if (!title || title.length > 200 || description.length > 5000) return fail(res, 400, 'INVALID_TARGET', 'Judul wajib diisi (maksimal 200 karakter), deskripsi maksimal 5000 karakter.');
+  if ((req.body.audit_title != null && typeof req.body.audit_title !== 'string') || auditTitle.length > 200) return fail(res, 400, 'INVALID_AUDIT_TITLE', 'Judul audit harus berupa teks maksimal 200 karakter.');
   if (!Number.isInteger(Number(assigned_to)) || Number(assigned_to) <= 0) return fail(res, 400, 'INVALID_ASSIGNEE', 'Pilih member untuk target ini.');
   if (!['low', 'medium', 'high', 'critical'].includes(priority)) return fail(res, 400, 'INVALID_PRIORITY', 'Prioritas tidak valid.');
   if (typeof due_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(due_date) || Number.isNaN(Date.parse(due_date)) || new Date(due_date).toISOString().slice(0, 10) !== due_date) return fail(res, 400, 'INVALID_DATE', 'Tanggal tenggat tidak valid.');
@@ -74,14 +76,14 @@ async function createTarget(req, res) {
     if (!Number.isInteger(engagementId) || engagementId < 1) return fail(res, 400, 'INVALID_ENGAGEMENT', 'Pilih judul audit yang valid.');
     const { rows: engagements } = await db.query('SELECT id, start_date, due_date FROM audit_engagements WHERE id = $1', [engagementId]);
     if (!engagements[0]) return fail(res, 404, 'ENGAGEMENT_NOT_FOUND', 'Judul audit tidak ditemukan.');
-    const engagementStart = String(engagements[0].start_date).slice(0, 10);
-    const engagementDue = String(engagements[0].due_date).slice(0, 10);
+    const engagementStart = dateOnly(engagements[0].start_date);
+    const engagementDue = dateOnly(engagements[0].due_date);
     if (start_date && (start_date < engagementStart || start_date > engagementDue)) return fail(res, 400, 'OUTSIDE_ENGAGEMENT_DATES', 'Tanggal mulai target harus berada dalam rentang judul audit.');
     if (due_date < engagementStart || due_date > engagementDue) return fail(res, 400, 'OUTSIDE_ENGAGEMENT_DATES', 'Tenggat target harus berada dalam rentang judul audit.');
   }
   const { rows } = await db.query(
-    'INSERT INTO targets (title, description, assigned_to, created_by, due_date, priority, start_date, reviewer, evidence_needed, engagement_id) VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::date, CURRENT_DATE), $8, $9, $10) RETURNING id',
-    [title, description, members[0].id, req.user.id, due_date, priority, start_date || null, reviewer, evidenceNeeded, engagementId],
+    'INSERT INTO targets (title, description, assigned_to, created_by, due_date, priority, start_date, reviewer, evidence_needed, engagement_id, audit_title) VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::date, CURRENT_DATE), $8, $9, $10, $11) RETURNING id',
+    [title, description, members[0].id, req.user.id, due_date, priority, start_date || null, reviewer, evidenceNeeded, engagementId, auditTitle],
   );
   res.status(201).json(await getTarget(rows[0].id));
 }
@@ -95,9 +97,9 @@ async function assignTargetEngagement(req, res) {
   if (engagementId !== null) {
     const { rows: engagements } = await db.query('SELECT start_date, due_date FROM audit_engagements WHERE id = $1', [engagementId]);
     if (!engagements[0]) return fail(res, 404, 'ENGAGEMENT_NOT_FOUND', 'Judul audit tidak ditemukan.');
-    const start = String(engagements[0].start_date).slice(0, 10);
-    const due = String(engagements[0].due_date).slice(0, 10);
-    if (String(targets[0].start_date).slice(0, 10) < start || String(targets[0].due_date).slice(0, 10) > due) return fail(res, 400, 'OUTSIDE_ENGAGEMENT_DATES', 'Rentang tanggal sasaran berada di luar judul audit.');
+    const start = dateOnly(engagements[0].start_date);
+    const due = dateOnly(engagements[0].due_date);
+    if (dateOnly(targets[0].start_date) < start || dateOnly(targets[0].due_date) > due) return fail(res, 400, 'OUTSIDE_ENGAGEMENT_DATES', 'Rentang tanggal sasaran berada di luar judul audit.');
   }
   await db.query('UPDATE targets SET engagement_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [engagementId, targetId]);
   res.json(await getTarget(targetId));

@@ -1,7 +1,7 @@
 {
   "name": "audit-monitor-backend",
   "version": "1.0.0",
-  "description": "Backend for Audit Monitor Platform",
+  "description": "Backend for SIGAP — Sistem Informasi Gerak Audit Progresif",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

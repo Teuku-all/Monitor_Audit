@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const { newDb } = require('pg-mem');
 const { normalizeFilename } = require('../src/utils/normalizeFilename');
+const { dateOnly, withScheduleStatus } = require('../src/utils/auditDates');
 
 process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = 'postgres://test:test@localhost/audit_test';
@@ -106,6 +107,17 @@ function disguisedDocumentForm(targetId) {
   return form;
 }
 
+test('database date values retain their calendar day and schedule risk', () => {
+  assert.equal(dateOnly(new Date(2030, 11, 1)), '2030-12-01');
+  assert.equal(dateOnly('2030-12-01'), '2030-12-01');
+  assert.equal(dateOnly('2030-12-01T00:00:00.000Z'), '2030-12-01');
+  const scheduled = withScheduleStatus({ start_date: new Date(2030, 11, 1), due_date: new Date(2030, 11, 2), status: 'assigned' }, '2030-12-01');
+  assert.equal(scheduled.start_date, '2030-12-01');
+  assert.equal(scheduled.due_date, '2030-12-02');
+  assert.equal(scheduled.remaining_days, 1);
+  assert.equal(scheduled.schedule_status, 'yellow');
+});
+
 test('PostgreSQL routes retain auth, permissions, targets, uploads, and discussions', async t => {
   t.after(async () => {
     if (server) await new Promise(resolve => server.close(resolve));
@@ -184,6 +196,7 @@ test('PostgreSQL routes retain auth, permissions, targets, uploads, and discussi
 
   const targetBody = {
     title: 'Review quarterly audit',
+    audit_title: '  Audit pengadaan dan kepatuhan 2030  ',
     description: 'Review the evidence and submit findings.',
     assigned_to: ownerId,
     due_date: '2030-12-20',
@@ -208,12 +221,27 @@ test('PostgreSQL routes retain auth, permissions, targets, uploads, and discussi
     method: 'POST',
     body: { ...targetBody, start_date: '2030-12-21' },
   })).status, 400);
+  for (const auditTitle of ['x'.repeat(201), 42, { title: 'Invalid title' }]) {
+    const invalidAuditTitle = await request('/targets', {
+      token: admin.token,
+      method: 'POST',
+      body: { ...targetBody, audit_title: auditTitle },
+    });
+    assert.equal(invalidAuditTitle.status, 400);
+    assert.equal(invalidAuditTitle.data.code, 'INVALID_AUDIT_TITLE');
+  }
   const created = await request('/targets', { token: admin.token, method: 'POST', body: targetBody });
   assert.equal(created.status, 201);
   assert.equal(created.data.assigned_name, 'Member One');
   assert.equal(created.data.reviewer, 'Audit lead');
   assert.equal(created.data.evidence_needed, 'Signed workpapers');
+  assert.equal(created.data.audit_title, 'Audit pengadaan dan kepatuhan 2030');
+  assert.equal(created.data.engagement_title, created.data.audit_title);
+  assert.equal(created.data.engagement_id, null);
+  assert.equal(created.data.program_id, null);
   const targetId = created.data.id;
+  assert.equal((await request('/targets', { token: owner.token })).data[0].audit_title, created.data.audit_title);
+  assert.equal((await request(`/targets/${targetId}`, { token: owner.token })).data.engagement_title, created.data.audit_title);
   const other = await login('other@example.test', memberPassword);
   assert.equal((await request('/targets', { token: other.token })).data.length, 0);
   assert.equal((await request(`/targets/${targetId}`, { token: other.token })).status, 403);
@@ -354,4 +382,42 @@ test('PostgreSQL routes retain auth, permissions, targets, uploads, and discussi
   assert.equal(stats.data.monthly.length, 12);
   assert.equal((await request('/users', { token: admin.token })).data.find(member => member.id === ownerId).completed_targets, 1);
   assert.equal(normalizeFilename(Buffer.from(unicodeFilename, 'utf8').toString('latin1')), unicodeFilename);
+
+  await t.test('manual audit titles preserve legacy targets and real audit grouping', async () => {
+    const { audit_title, ...legacyBody } = targetBody;
+    const legacy = await request('/targets', {
+      token: admin.token, method: 'POST', body: legacyBody,
+    });
+    assert.equal(legacy.status, 201);
+    assert.equal(legacy.data.audit_title, '');
+    assert.equal(legacy.data.engagement_title, null);
+
+    const { rows: programs } = await pool.query(`INSERT INTO audit_programs
+      (title, start_date, due_date, created_by) VALUES ($1,$2,$3,$4) RETURNING id`,
+    ['Program audit 2030', '2030-12-01', '2030-12-31', admin.user.id]);
+    const { rows: engagements } = await pool.query(`INSERT INTO audit_engagements
+      (program_id, title, start_date, due_date) VALUES ($1,$2,$3,$4) RETURNING id`,
+    [programs[0].id, 'Judul audit dalam program', '2030-12-01', '2030-12-31']);
+    const linkedBody = { ...targetBody, title: 'Grouped target', engagement_id: engagements[0].id, due_date: '2030-12-31' };
+    const linked = await request('/targets', { token: admin.token, method: 'POST', body: linkedBody });
+    assert.equal(linked.status, 201, JSON.stringify(linked.data));
+    assert.equal(linked.data.engagement_id, engagements[0].id);
+    assert.equal(linked.data.start_date, '2030-12-01');
+    assert.equal(linked.data.due_date, '2030-12-31');
+    assert.equal(Number.isFinite(linked.data.remaining_days), true);
+    for (const outsideDates of [{ start_date: '2030-11-30' }, { due_date: '2031-01-01' }]) {
+      const outside = await request('/targets', { token: admin.token, method: 'POST', body: { ...linkedBody, ...outsideDates } });
+      assert.equal(outside.status, 400);
+      assert.equal(outside.data.code, 'OUTSIDE_ENGAGEMENT_DATES');
+    }
+    const assignment = await request(`/targets/${targetId}/engagement`, {
+      token: admin.token, method: 'PATCH', body: { engagement_id: engagements[0].id },
+    });
+    assert.equal(assignment.status, 200, JSON.stringify(assignment.data));
+    const grouped = await request(`/targets/${targetId}`, { token: owner.token });
+    assert.equal(grouped.status, 200);
+    assert.equal(grouped.data.engagement_title, 'Judul audit dalam program');
+    assert.equal(grouped.data.audit_title, created.data.audit_title);
+    assert.equal(grouped.data.program_id, programs[0].id);
+  });
 });

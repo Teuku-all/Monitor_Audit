@@ -13,7 +13,6 @@ export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [transitionOut, setTransitionOut] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const googleContainer = useRef(null);
   const [googleWidth, setGoogleWidth] = useState(390);
@@ -39,16 +38,7 @@ export default function Login() {
     googleAccount: t('Akun Google ini belum terdaftar. Hubungi administrator untuk akses.', 'This Google account is not registered. Contact your administrator for access.'),
   };
 
-  async function completeSignIn(user, startedAt) {
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!reducedMotion) {
-      const remaining = Math.max(0, 520 - (performance.now() - startedAt));
-      if (remaining) await new Promise(resolve => window.setTimeout(resolve, remaining));
-    }
-    setTransitionOut(true);
-    if (!reducedMotion) {
-      await new Promise(resolve => window.setTimeout(resolve, 1100));
-    }
+  function completeSignIn(user) {
     navigate(user.role === 'admin' ? '/admin' : '/member', { replace: true });
   }
 
@@ -57,12 +47,11 @@ export default function Login() {
     if (loading) return;
     setError('');
     setLoading(true);
-    const startedAt = performance.now();
     let succeeded = false;
     try {
       const user = await login(form.email, form.password);
       succeeded = true;
-      await completeSignIn(user, startedAt);
+      completeSignIn(user);
     } catch (err) {
       setError([400, 401].includes(err.response?.status) ? 'credentials' : err.response ? 'failed' : 'connection');
     } finally { if (!succeeded) setLoading(false); }
@@ -76,12 +65,11 @@ export default function Login() {
     }
     setError('');
     setLoading(true);
-    const startedAt = performance.now();
     let succeeded = false;
     try {
       const user = await loginWithGoogle(response.credential);
       succeeded = true;
-      await completeSignIn(user, startedAt);
+      completeSignIn(user);
     } catch (err) {
       const code = err.response?.data?.code;
       setError(code === 'GOOGLE_LOGIN_UNAVAILABLE' ? 'googleConfig' : code === 'REGISTRATION_DISABLED' ? 'googleAccount' : 'google');
@@ -90,7 +78,7 @@ export default function Login() {
     }
   }
 
-  return <AuthLayout transitionOut={transitionOut}>
+  return <AuthLayout>
     <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#052659]">{t('Selamat datang kembali', 'Welcome back')}</p>
     <h2 className="text-[30px] font-semibold tracking-[-0.04em] text-[#052659]">{t('Masuk ke ruang kerja', 'Sign in to your workspace')}</h2>
     <p className="mt-3 text-sm leading-6 text-slate-500">{t('Lanjutkan pekerjaan dan pantau kemajuan tim Anda.', 'Pick up where you left off and follow your team’s progress.')}</p>

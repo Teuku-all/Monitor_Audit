@@ -3,16 +3,16 @@ import { useLanguage } from '../context/LanguageContext';
 import BrandMark from './BrandMark';
 import ThemeToggle from './ThemeToggle';
 
-export default function AuthLayout({ children, transitionOut = false }) {
+export default function AuthLayout({ children }) {
   const { language, setLanguage, t } = useLanguage();
   const { pathname } = useLocation();
   return (
-    <main className={`auth-layout ${pathname === '/login' ? 'auth-layout--login' : ''} ${transitionOut ? 'auth-login--success' : ''} flex min-h-screen items-center justify-center bg-[#FFFFFF] p-4 sm:p-8`}>
+    <main className={`auth-layout ${pathname === '/login' ? 'auth-layout--login' : ''} flex min-h-screen items-center justify-center bg-[#FFFFFF] p-4 sm:p-8`}>
       <div className={`auth-card ${pathname === '/login' ? 'auth-card--login' : ''} grid w-full max-w-[1120px] overflow-hidden rounded-[28px] border border-white bg-white shadow-[0_24px_80px_rgba(5,38,89,0.1)] lg:min-h-[720px] lg:grid-cols-[0.95fr_1.05fr]`}>
         <section className="auth-visual relative hidden flex-col justify-between overflow-hidden bg-[#052659] p-12 text-white lg:flex">
           <div className="pointer-events-none absolute -right-40 top-28 h-[480px] w-[480px] rounded-full border border-[#C2E8FF]/20"/>
           <div className="pointer-events-none absolute -right-24 top-44 h-[350px] w-[350px] rounded-full border border-[#C2E8FF]/20"/>
-          <Link to="/login" className="relative flex items-center gap-3"><BrandMark size={42}/><span className="text-lg font-semibold tracking-tight">Audit Monitor<span className="mt-0.5 block text-[10px] font-medium uppercase tracking-[0.16em] text-[#C2E8FF]/70">{t('Ruang kerja tim', 'Team workspace')}</span></span></Link>
+          <Link to="/login" className="relative flex items-center gap-3"><BrandMark size={42}/><span className="text-xl font-semibold tracking-tight">SIGAP<span className="mt-1 block max-w-[230px] text-[10px] font-medium leading-4 tracking-normal text-[#C2E8FF]/70">Sistem Informasi Gerak Audit Progresif</span></span></Link>
           <div className="relative py-12">
             <span className="inline-flex items-center gap-2 rounded-full border border-[#C2E8FF]/30 bg-[#052659]/20 px-3 py-1.5 text-[11px] font-medium text-[#C2E8FF]"><span className="h-1.5 w-1.5 rounded-full bg-[#C2E8FF]"/>{t('Satu tim. Tujuan yang sama.', 'One team. Shared goals.')}</span>
             <h1 className="mt-6 text-[42px] font-semibold leading-[1.15] tracking-[-0.04em]">{t('Kerja lebih terarah.', 'Work with direction.')}<span className="mt-1 block text-[#C2E8FF]">{t('Hasil lebih terukur.', 'Progress you can see.')}</span></h1>
@@ -28,7 +28,7 @@ export default function AuthLayout({ children, transitionOut = false }) {
         </section>
         <section className="auth-form-panel flex flex-col px-6 py-6 sm:px-10 lg:px-14">
           <div className="mb-7 flex items-center justify-between gap-3 lg:justify-end">
-            <Link to="/login" className="flex items-center gap-2 text-sm font-semibold text-[#052659] lg:hidden"><BrandMark size={36}/><span>Audit Monitor</span></Link>
+            <Link to="/login" className="flex items-center gap-2 text-sm font-semibold text-[#052659] lg:hidden"><BrandMark size={36}/><span>SIGAP</span></Link>
             <div className="auth-header-controls">
               <ThemeToggle />
               <div className="flex items-center gap-1 rounded-full bg-slate-100 p-1" aria-label={t('Pilih bahasa', 'Choose language')}>
@@ -38,10 +38,9 @@ export default function AuthLayout({ children, transitionOut = false }) {
             </div>
           </div>
           <div key={pathname} className={`auth-route-transition ${pathname === '/login' ? 'auth-login-transition' : ''} mx-auto flex w-full max-w-[390px] flex-1 flex-col justify-center py-5`}>{children}</div>
-          <p className="mt-7 text-center text-[11px] text-slate-400">Audit Monitor &middot; {t('Ruang kerja audit yang terorganisir', 'Your organized audit workspace')}</p>
+          <p className="mt-7 text-center text-[11px] leading-5 text-slate-400">SIGAP &middot; Sistem Informasi Gerak Audit Progresif</p>
         </section>
       </div>
-      {transitionOut && <div className="auth-exit-curtain" aria-hidden="true"><span className="transition-curtain-surface" /><div className="transition-brand"><BrandMark size={92} /><strong>Audit Monitoring</strong></div></div>}
     </main>
   );
 }

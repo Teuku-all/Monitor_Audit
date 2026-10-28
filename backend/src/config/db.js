@@ -71,6 +71,7 @@ async function initDB() {
       blocker_impact TEXT NOT NULL DEFAULT '',
       follow_up TEXT NOT NULL DEFAULT '',
       evidence_needed TEXT NOT NULL DEFAULT '',
+      audit_title TEXT NOT NULL DEFAULT '',
       engagement_id INTEGER REFERENCES audit_engagements(id),
       completed_at TIMESTAMPTZ,
       review_rounds INTEGER NOT NULL DEFAULT 0,
@@ -92,6 +93,7 @@ async function initDB() {
     ALTER TABLE targets ADD COLUMN IF NOT EXISTS blocker_impact TEXT NOT NULL DEFAULT '';
     ALTER TABLE targets ADD COLUMN IF NOT EXISTS follow_up TEXT NOT NULL DEFAULT '';
     ALTER TABLE targets ADD COLUMN IF NOT EXISTS evidence_needed TEXT NOT NULL DEFAULT '';
+    ALTER TABLE targets ADD COLUMN IF NOT EXISTS audit_title TEXT NOT NULL DEFAULT '';
     ALTER TABLE targets ADD COLUMN IF NOT EXISTS engagement_id INTEGER REFERENCES audit_engagements(id);
     ALTER TABLE targets ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
     ALTER TABLE targets ADD COLUMN IF NOT EXISTS review_rounds INTEGER NOT NULL DEFAULT 0;

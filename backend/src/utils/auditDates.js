@@ -5,6 +5,16 @@ function validDate(value) {
     && new Date(value).toISOString().slice(0, 10) === value;
 }
 
+function dateOnly(value) {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return '';
+    // PostgreSQL DATE values are parsed at local midnight, so UTC conversion can shift the day.
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  }
+  const day = typeof value === 'string' ? value.slice(0, 10) : '';
+  return validDate(day) ? day : '';
+}
+
 function addBusinessDays(startDate, days) {
   const date = new Date(`${startDate}T12:00:00.000Z`);
   let added = 0;
@@ -25,10 +35,11 @@ function jakartaDate() {
 }
 
 function withScheduleStatus(item, today = jakartaDate()) {
-  const remainingDays = Math.ceil((Date.parse(`${item.due_date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000);
+  const dueDate = dateOnly(item.due_date);
+  const remainingDays = Math.ceil((Date.parse(`${dueDate}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000);
   const complete = item.status === 'completed';
   const schedule_status = complete ? 'green' : remainingDays < 0 ? 'red' : remainingDays <= 3 ? 'yellow' : 'green';
-  return { ...item, remaining_days: remainingDays, schedule_status };
+  return { ...item, ...(item.start_date != null ? { start_date: dateOnly(item.start_date) } : {}), due_date: dueDate, remaining_days: remainingDays, schedule_status };
 }
 
-module.exports = { validDate, addBusinessDays, jakartaDate, withScheduleStatus };
+module.exports = { validDate, dateOnly, addBusinessDays, jakartaDate, withScheduleStatus };

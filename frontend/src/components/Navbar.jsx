@@ -22,8 +22,8 @@ export default function Navbar() {
             </svg>
           </div>
           <div>
-            <span className="block font-semibold text-white text-[15px] tracking-tight">Audit Monitor</span>
-            <span className="block text-[10px] text-gray-500 tracking-[.12em] uppercase mt-0.5">Workspace</span>
+            <span className="block font-semibold text-white text-[15px] tracking-tight">SIGAP</span>
+            <span className="block max-w-[180px] text-[10px] leading-4 text-blue-100/75 mt-0.5">Sistem Informasi Gerak Audit Progresif</span>
           </div>
         </div>
 
