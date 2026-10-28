@@ -86,6 +86,7 @@ async function initDB() {
     ALTER TABLE targets ADD COLUMN IF NOT EXISTS start_date DATE NOT NULL DEFAULT CURRENT_DATE;
     ALTER TABLE targets ADD COLUMN IF NOT EXISTS reviewer TEXT NOT NULL DEFAULT '';
     ALTER TABLE targets ADD COLUMN IF NOT EXISTS audit_status TEXT NOT NULL DEFAULT 'Belum Mulai';
+    UPDATE targets SET audit_status = 'Menunggu Review' WHERE audit_status = 'Review Ketua Tim';
     ALTER TABLE targets ADD COLUMN IF NOT EXISTS data_progress INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE targets ADD COLUMN IF NOT EXISTS analysis_progress INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE targets ADD COLUMN IF NOT EXISTS workpaper_progress INTEGER NOT NULL DEFAULT 0;
@@ -102,6 +103,36 @@ async function initDB() {
     ALTER TABLE targets ADD COLUMN IF NOT EXISTS quality_conclusion_reviewed BOOLEAN;
     ALTER TABLE targets ADD COLUMN IF NOT EXISTS quality_review_notes TEXT NOT NULL DEFAULT '';
     ALTER TABLE targets ADD COLUMN IF NOT EXISTS quality_reviewed_at TIMESTAMPTZ;
+    CREATE TABLE IF NOT EXISTS target_role_assignments (
+      id SERIAL PRIMARY KEY,
+      target_id INTEGER NOT NULL REFERENCES targets(id) ON DELETE CASCADE,
+      role_name TEXT NOT NULL,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      work_target TEXT NOT NULL DEFAULT '',
+      required_documents TEXT NOT NULL DEFAULT '',
+      progress INTEGER NOT NULL DEFAULT 0 CHECK(progress BETWEEN 0 AND 100),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(target_id, role_name, user_id)
+    );
+    ALTER TABLE target_role_assignments ADD COLUMN IF NOT EXISTS work_target TEXT NOT NULL DEFAULT '';
+    ALTER TABLE target_role_assignments ADD COLUMN IF NOT EXISTS required_documents TEXT NOT NULL DEFAULT '';
+    ALTER TABLE target_role_assignments ADD COLUMN IF NOT EXISTS progress INTEGER NOT NULL DEFAULT 0;
+    CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    DO $migration$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM app_migrations WHERE name = 'seed_role_progress_2026_10') THEN
+        UPDATE target_role_assignments ra SET progress = t.progress FROM targets t
+          WHERE t.id = ra.target_id AND ra.progress = 0 AND t.progress > 0;
+        INSERT INTO app_migrations(name) VALUES ('seed_role_progress_2026_10');
+      END IF;
+    END $migration$;
+    CREATE TABLE IF NOT EXISTS target_documents (
+      id SERIAL PRIMARY KEY,
+      target_id INTEGER NOT NULL REFERENCES targets(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      drive_url TEXT NOT NULL,
+      added_by INTEGER NOT NULL REFERENCES users(id),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
     ALTER TABLE targets DROP CONSTRAINT IF EXISTS targets_priority_check;
     ALTER TABLE targets ADD CONSTRAINT targets_priority_check CHECK(priority IN ('low', 'medium', 'high', 'critical'));
     CREATE TABLE IF NOT EXISTS submissions (

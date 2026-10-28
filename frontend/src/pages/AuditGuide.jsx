@@ -2,7 +2,7 @@ import { useLanguage } from '../context/LanguageContext';
 import Icon from '../components/Icon';
 
 const guide = [
-  ['Sasaran Audit','Audit objective','Satu baris/target mewakili satu sasaran dengan PIC dan output yang jelas. Jika satu PIC menangani beberapa sasaran, buat target terpisah.','Each target represents one objective with a clear owner and output. Create separate targets when one person handles multiple objectives.','target'],
+  ['Sasaran Audit','Audit objective','Satu target mewakili satu tugas audit dengan output yang jelas. Admin dapat membagi tugas ke beberapa anggota melalui peran anggota.','Each target represents one audit task with a clear output. Admins can assign multiple members through member roles.','target'],
   ['Progres keseluruhan','Overall progress','Gunakan estimasi berbasis output yang selesai, dari 0 sampai 100%. Dashboard merata-ratakan progres setiap sasaran.','Estimate based on completed outputs from 0 to 100%. The dashboard averages progress across objectives.','chart'],
   ['Pengumpulan Data','Data collection','Ukur kelengkapan data dan dokumen yang sudah diperoleh serta diverifikasi awal. Bedakan data yang diminta, diterima, dan valid.','Measure data and document completeness after initial verification. Distinguish requested, received, and validated data.','file'],
   ['Analisa Data','Data analysis','Ukur analisa yang telah dilakukan terhadap rencana pengujian. Catat teknik analisa dan populasi pada kertas kerja.','Measure analysis completed against the test plan. Record methods and populations in the workpapers.','search'],
@@ -15,7 +15,7 @@ const guide = [
   ['Berjalan','In progress','Aktivitas berlangsung sesuai rencana. Perbarui progres dan tanggal update secara berkala.','Work is proceeding to plan. Update progress regularly.','chart'],
   ['Menunggu Data','Waiting for data','Pekerjaan menunggu data atau konfirmasi. Catat pihak yang diminta, tanggal permintaan, dan tindak lanjut.','Work is waiting for data or confirmation. Record the request owner, request date, and follow-up.','file'],
   ['Terhambat','Blocked','Kendala signifikan memengaruhi jadwal atau ruang lingkup. Catat kendala, dampak, mitigasi, dan eskalasi.','A significant issue affects timing or scope. Record the blocker, impact, mitigation, and escalation.','flag'],
-  ['Review Ketua Tim','Team lead review','PIC mengirim pekerjaan untuk review. Ketua tim memeriksa checklist mutu dan memberi umpan balik. Target hanya berstatus selesai setelah disetujui.','The owner submits work for review. The team lead checks the quality checklist and provides feedback. A target is complete only after approval.','users'],
+  ['Menunggu Review','Pending review','Anggota mengirim pekerjaan untuk ditinjau admin. Admin memeriksa checklist mutu dan memberi umpan balik. Target hanya berstatus selesai setelah disetujui.','Members submit work for admin review. The admin checks the quality checklist and provides feedback. A target is complete only after approval.','users'],
   ['Selesai','Complete','Pengujian dan kertas kerja selesai, dengan bukti serta simpulan yang direview.','Testing and workpapers are complete, with evidence and conclusions reviewed.','check'],
   ['Prioritas Kritis','Critical priority','Risiko berpotensi berdampak besar atau memerlukan respons segera; gunakan berdasarkan penilaian auditor.','Use when a risk could have a significant impact or needs an immediate response, based on auditor judgment.','flag'],
 ];

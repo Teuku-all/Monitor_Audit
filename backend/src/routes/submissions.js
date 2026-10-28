@@ -11,6 +11,7 @@ const {
   getMySubmissions,
   getSubmissionById,
   downloadSubmission,
+  previewSubmission,
   createSubmission,
   updateStatus,
   getStats,
@@ -27,6 +28,7 @@ router.post('/', uploadLimiter, asyncHandler(authenticate), requireRole('member'
 
 // Both roles
 router.get('/:id/file', asyncHandler(authenticate), asyncHandler(downloadSubmission));
+router.get('/:id/preview', asyncHandler(authenticate), asyncHandler(previewSubmission));
 router.get('/:id', asyncHandler(authenticate), asyncHandler(getSubmissionById));
 
 module.exports = router;

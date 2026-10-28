@@ -11,6 +11,11 @@ router.patch('/data-requests/:requestId', asyncHandler(controller.updateDataRequ
 router.get('/:id/work-logs', asyncHandler(controller.listWorkLogs));
 router.post('/:id/work-logs', asyncHandler(controller.createWorkLog));
 router.patch('/:id/engagement', requireRole('admin'), asyncHandler(controller.assignTargetEngagement));
+router.patch('/:id/roles/:roleId/progress', asyncHandler(controller.updateRoleProgress));
+router.put('/:id/roles', requireRole('admin'), asyncHandler(controller.setTargetRoles));
+router.post('/:id/documents', requireRole('admin'), asyncHandler(controller.addTargetDocument));
+router.delete('/:id/documents/:documentId', requireRole('admin'), asyncHandler(controller.removeTargetDocument));
+router.get('/:id/documents/:documentId/files', asyncHandler(controller.listTargetFolderFiles));
 router.get('/:id', asyncHandler(controller.targetDetail));
 router.post('/', requireRole('admin'), asyncHandler(controller.createTarget));
 router.patch('/:id/progress', requireRole('member'), asyncHandler(controller.updateProgress));

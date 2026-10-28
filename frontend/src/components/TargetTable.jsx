@@ -29,14 +29,14 @@ export default function TargetTable({ targets, compact = false }) {
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   if (!targets.length) {
-    return <EmptyState icon="target" title={t('Belum ada target di sini', 'No targets here yet')} description={admin ? t('Buat target dan pilih anggota tim untuk memulai.', 'Create a target and assign a team member to get started.') : t('Target dari admin akan muncul di sini.', 'Targets assigned by your administrator will appear here.')} />;
+    return <EmptyState icon="target" title={t('Belum ada target di sini', 'No targets here yet')} description={admin ? t('Buat tugas dan tetapkan peran anggota untuk memulai.', 'Create a task and assign member roles to get started.') : t('Target dari admin akan muncul di sini.', 'Targets assigned by your administrator will appear here.')} />;
   }
 
   return <div className="table-scroll" role="region" aria-label={t('Tabel sasaran audit', 'Audit objectives table')} tabIndex={0}>
     <table className="data-table responsive-table">
       <thead><tr>
         <th scope="col">{t('Sasaran audit', 'Audit objective')}</th>
-        {admin && <th scope="col">{t('Ditugaskan ke', 'Assigned to')}</th>}
+        {admin && <th scope="col">{t('Tim penanggung jawab', 'Responsible team')}</th>}
         <th scope="col">{t('Progres', 'Progress')}</th>
         {!compact && <th scope="col">{t('Prioritas', 'Priority')}</th>}
         <th scope="col">{t('Tenggat', 'Due date')}</th>
@@ -46,7 +46,7 @@ export default function TargetTable({ targets, compact = false }) {
       </tr></thead>
       <tbody>{targets.map(item => <tr key={item.id}>
         <td data-label={t('Sasaran audit', 'Audit objective')}><Link className="table-title" to={`/${admin ? 'admin' : 'member'}/targets/${item.id}`}>{item.title}</Link>{(item.engagement_title || item.audit_title) && <small>{item.engagement_title || item.audit_title}</small>}<small>#{String(item.id).padStart(3, '0')}</small></td>
-        {admin && <td data-label={t('Ditugaskan ke', 'Assigned to')}><span className="person-cell"><span className="avatar avatar-small">{item.assigned_name?.charAt(0)}</span>{item.assigned_name}</span></td>}
+        {admin && <td data-label={t('Tim penanggung jawab', 'Responsible team')}><span className="person-cell"><span className="avatar avatar-small"><Icon name="users" size={13}/></span>{item.assigned_team || item.assigned_name}</span></td>}
         <td data-label={t('Progres', 'Progress')}><ProgressBar value={item.progress} /></td>
         {!compact && <td data-label={t('Prioritas', 'Priority')}><Priority value={item.priority} /></td>}
         <td data-label={t('Tenggat', 'Due date')} className={item.due_date < today && !['completed', 'submitted'].includes(item.status) ? 'overdue' : ''}>{formatDate(item.due_date, { day: 'numeric', month: 'short' })}</td>

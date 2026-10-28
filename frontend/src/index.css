@@ -1345,3 +1345,5 @@ html[data-theme="dark"] .target-form .form-actions{background:rgba(17,24,39,.97)
   .route-page-enter,.workspace-header-route,.auth-route-transition,.auth-card--login,.modal-layer,.modal{animation:none!important;}
   .progress-track span,.audit-track i{transition:none;}
 }
+.task-monitoring-summary{grid-template-columns:repeat(4,minmax(0,1fr));}
+@media(max-width:640px){.task-monitoring-summary{grid-template-columns:repeat(2,minmax(0,1fr));}.task-monitoring-summary>div:last-child{grid-column:auto;}}

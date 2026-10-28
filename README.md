@@ -10,10 +10,11 @@ Requirements: Node.js 20+ and npm.
 2. Create a Neon project and set its PostgreSQL connection string as `DATABASE_URL` in the root `.env`.
 3. Create a Google OAuth 2.0 Web client ID. Add the local frontend origin (`http://localhost:5173`) to its authorized JavaScript origins. Set the same client ID in `GOOGLE_CLIENT_ID` and `VITE_GOOGLE_CLIENT_ID` in the root `.env`.
 4. Create a Cloudinary account and set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` in the root `.env`.
-5. Set a random `JWT_SECRET` of at least 20 characters and set a password of at least 8 characters in `ADMIN_PASSWORD` for the initial administrator.
-6. In `backend/`, run `npm install` and then `npm run dev`.
-7. Keep `VITE_API_URL=/api` in the root `.env`. The Vite development proxy forwards `/api` to the local backend, and Vercel routes `/api` to the deployed backend. Then run `npm install` and `npm run dev` in `frontend/`.
-8. Open `http://localhost:5173`.
+5. In Google Cloud, enable the Google Drive API and create an API key restricted to that API. Set it as `GOOGLE_DRIVE_API_KEY`. Folder listing uses this key on the backend, so only folders shared as **Anyone with the link** can be listed. Do not expose this key in frontend variables.
+6. Set a random `JWT_SECRET` of at least 20 characters and set a password of at least 8 characters in `ADMIN_PASSWORD` for the initial administrator.
+7. In `backend/`, run `npm install` and then `npm run dev`.
+8. Keep `VITE_API_URL=/api` in the root `.env`. The Vite development proxy forwards `/api` to the local backend, and Vercel routes `/api` to the deployed backend. Then run `npm install` and `npm run dev` in `frontend/`.
+9. Open `http://localhost:5173`.
 
 The backend creates or updates the required tables in Neon at startup. Existing SQLite data is not automatically migrated; migrate existing accounts and submissions before switching a deployment to Neon. New document uploads are stored as authenticated Cloudinary assets and are downloaded only through an authorized API endpoint.
 
@@ -30,6 +31,7 @@ The repository is configured as one Vercel project: Vercel builds the Vite front
    - `SESSION_HOURS` (optional, defaults to 4 and accepts 1–24)
    - `ADMIN_EMAIL` and `ADMIN_PASSWORD` (at least 8 characters; at most 72 bytes)
    - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_DRIVE_API_KEY` (restricted to Google Drive API; needed to list shared Drive folders)
    - `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET`
 3. Add `VITE_GOOGLE_CLIENT_ID` with the same Google Web client ID. The production build always uses the same-origin `/api` endpoint.
    Keep `ALLOW_PUBLIC_REGISTRATION` and `VITE_ALLOW_REGISTRATION` disabled for an internal audit workspace.
@@ -40,7 +42,7 @@ Vercel serverless functions have a smaller request-body limit than a persistent 
 
 ## Work target lifecycle
 
-Admins assign an audit objective to one registered member with instructions, reviewer, start and due dates, priority, and expected evidence. Target details track overall progress plus data collection, analysis, and workpaper progress; members also record audit status, blockers, impact, follow-up, and evidence needs. At 100%, the target is submitted for review. Admins can complete it or request a revision with feedback. The dashboard summarizes audit progress and status distribution. Coaching records are linked to targets and track guidance, follow-up owners, deadlines, status, and next review. The audit guide includes the status and progress definitions from the workbook. Members can attach audit documents to a target and see linked submissions and discussion.
+Admins assign each audit task to a team by defining member roles. Each role can have its own work target and required-document list, shown as subtasks on the task detail page. Admins then monitor progress, status, and deadlines by task. Target details track overall progress plus data collection, analysis, and workpaper progress; members also record audit status, blockers, impact, follow-up, and evidence needs. At 100%, the target is submitted for review. Admins can complete it or request a revision with feedback. Admins can attach Google Drive folder links; folder contents are listed in the task page without copying Drive files into app storage. The folders must be shared as **Anyone with the link** for the API key to list their contents. Coaching records are linked to targets and track guidance, follow-up owners, deadlines, status, and next review. Members can attach audit documents to a target and see linked submissions and discussion.
 
 The target form accepts a manually typed audit title and audit objective. Selecting an existing audit title from the suggestions links the objective to its program and fills its dates. Custom titles are saved independently and can be grouped into a program later. Startup automatically adds the optional `targets.audit_title` column to existing databases.
 
@@ -55,6 +57,9 @@ The target form accepts a manually typed audit title and audit objective. Select
 | GET | `/api/auth/profile` | Signed in | Verify current account |
 | GET | `/api/users` | Admin | List members and workload counts |
 | GET/POST | `/api/targets` | Signed in / Admin for POST | List targets / assign a target |
+| PUT | `/api/targets/:id/roles` | Admin | Set task member roles and assignees |
+| POST | `/api/targets/:id/documents` | Admin | Attach a Google Drive folder link to a task |
+| GET | `/api/targets/:id/documents/:documentId/files` | Task member or Admin | List files in a linked Drive folder shared by link |
 | GET | `/api/targets/:id` | Admin or assigned member | View a target and its documents |
 | PATCH | `/api/targets/:id/progress` | Assigned member | Update work progress and notes |
 | PATCH | `/api/targets/:id/review` | Admin | Complete a target or request a revision |

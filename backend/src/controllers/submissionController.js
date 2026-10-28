@@ -53,7 +53,8 @@ async function getSubmissionById(req, res) {
   const submission = rows[0];
   if (!submission) return res.status(404).json({ message: 'Submission tidak ditemukan.' });
   if (req.user.role === 'member' && submission.member_id !== req.user.id) {
-    return res.status(403).json({ message: 'Akses ditolak.' });
+    const { rows: access } = await db.query(`SELECT 1 FROM targets t WHERE t.id = $1 AND (t.assigned_to = $2 OR EXISTS (SELECT 1 FROM target_role_assignments a WHERE a.target_id = t.id AND a.user_id = $2))`, [submission.target_id, req.user.id]);
+    if (!access[0]) return res.status(403).json({ message: 'Akses ditolak.' });
   }
   const comments = await getCommentsForSubmission(submissionId);
   res.json({ ...normalizeSubmission(submission), comments });
@@ -63,12 +64,15 @@ async function downloadSubmission(req, res) {
   const submissionId = validId(req.params.id);
   if (!submissionId) return res.status(400).json({ code: 'INVALID_ID', message: 'ID dokumen tidak valid.' });
   const { rows } = await db.query(
-    'SELECT id, member_id, file_path, file_name, file_public_id, file_resource_type, file_format FROM submissions WHERE id = $1',
+    'SELECT id, member_id, target_id, file_path, file_name, file_public_id, file_resource_type, file_format FROM submissions WHERE id = $1',
     [submissionId],
   );
   const submission = rows[0];
   if (!submission) return res.status(404).json({ message: 'Dokumen tidak ditemukan.' });
-  if (req.user.role === 'member' && submission.member_id !== req.user.id) return res.status(403).json({ message: 'Akses ditolak.' });
+  if (req.user.role === 'member' && submission.member_id !== req.user.id) {
+    const { rows: access } = await db.query(`SELECT 1 FROM targets t WHERE t.id = $1 AND (t.assigned_to = $2 OR EXISTS (SELECT 1 FROM target_role_assignments a WHERE a.target_id = t.id AND a.user_id = $2))`, [submission.target_id, req.user.id]);
+    if (!access[0]) return res.status(403).json({ message: 'Akses ditolak.' });
+  }
 
   const sourceUrl = submission.file_public_id
     ? createPrivateDocumentUrl(submission.file_public_id, submission.file_resource_type || 'raw', submission.file_format)
@@ -82,14 +86,22 @@ async function downloadSubmission(req, res) {
   if (!upstream.ok) return res.status(502).json({ message: 'Dokumen belum dapat diambil dari penyimpanan.' });
   const content = Buffer.from(await upstream.arrayBuffer());
   const safeName = normalizeFilename(submission.file_name).replace(/[\r\n"\\]/g, '_');
+  const extension = normalizeFilename(submission.file_name).toLowerCase().split('.').pop();
+  const previewTypes = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' };
+  if (req.preview) res.set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'self'");
   res.set({
-    'Content-Type': upstream.headers.get('content-type') || 'application/octet-stream',
+    'Content-Type': req.preview ? (previewTypes[extension] || 'application/octet-stream') : (upstream.headers.get('content-type') || 'application/octet-stream'),
     'Content-Length': String(content.length),
-    'Content-Disposition': `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(safeName)}`,
+    'Content-Disposition': `${req.preview ? 'inline' : 'attachment'}; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(safeName)}`,
     'X-Content-Type-Options': 'nosniff',
     'Cache-Control': 'private, no-store, max-age=0',
   });
   return res.send(content);
+}
+
+async function previewSubmission(req, res) {
+  req.preview = true;
+  return downloadSubmission(req, res);
 }
 
 async function createSubmission(req, res) {
@@ -104,10 +116,13 @@ async function createSubmission(req, res) {
   if (req.body.target_id !== undefined && req.body.target_id !== '') {
     targetId = Number(req.body.target_id);
     if (!Number.isInteger(targetId)) return res.status(400).json({ message: 'Target tidak valid.' });
-    const { rows } = await db.query('SELECT assigned_to, status FROM targets WHERE id = $1', [targetId]);
+    const { rows } = await db.query('SELECT id, assigned_to, status FROM targets WHERE id = $1', [targetId]);
     const target = rows[0];
     if (!target) return res.status(404).json({ message: 'Target tidak ditemukan.' });
-    if (target.assigned_to !== req.user.id) return res.status(403).json({ message: 'Akses ditolak.' });
+    if (target.assigned_to !== req.user.id) {
+      const { rows: access } = await db.query('SELECT 1 FROM target_role_assignments WHERE target_id = $1 AND user_id = $2', [target.id, req.user.id]);
+      if (!access[0]) return res.status(403).json({ message: 'Akses ditolak.' });
+    }
     if (target.status === 'completed') return res.status(409).json({ message: 'Target sudah selesai.' });
   }
 
@@ -188,6 +203,7 @@ module.exports = {
   getMySubmissions,
   getSubmissionById,
   downloadSubmission,
+  previewSubmission,
   createSubmission,
   updateStatus,
   getStats,

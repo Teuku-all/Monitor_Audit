@@ -2,15 +2,36 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import { useLanguage } from '../../context/LanguageContext';
-import { ErrorState, LoadingState, EmptyState } from '../../components/States';
+import { ErrorState, LoadingState } from '../../components/States';
 import Icon from '../../components/Icon';
-export default function Members(){
- const {t,formatDate}=useLanguage();const [members,setMembers]=useState([]);const [loading,setLoading]=useState(true);const [failed,setFailed]=useState(false);const [attempt,setAttempt]=useState(0);const [query,setQuery]=useState('');
- useEffect(()=>{const c=new AbortController();setLoading(true);setFailed(false);api.get('/users',{signal:c.signal}).then(({data})=>setMembers(data)).catch(()=>{if(!c.signal.aborted)setFailed(true)}).finally(()=>{if(!c.signal.aborted)setLoading(false)});return()=>c.abort()},[attempt]);
- const visible=members.filter(m=>`${m.name} ${m.email}`.toLowerCase().includes(query.toLowerCase()));
- return <div className="workspace-page"><div className="page-heading"><div><span className="eyebrow">{t('Komposisi tim','Team directory')}</span><h1>{t('Anggota tim','Team members')}</h1><p>{t('Tinjau kapasitas, pekerjaan aktif, dan kontribusi setiap anggota.','Review each member’s workload and contributions.')}</p></div><Link className="btn-secondary" to="/admin/targets?create=1"><Icon name="plus" size={15}/>{t('Buat target','Create target')}</Link></div>
- <div className="member-summary"><div><span className="metric-icon"><Icon name="users" size={17}/></span><strong>{members.length}</strong><small>{t('Anggota terdaftar','Registered members')}</small></div><div><span className="metric-icon"><Icon name="target" size={17}/></span><strong>{members.reduce((n,m)=>n+Number(m.active_targets||0),0)}</strong><small>{t('Target aktif','Active targets')}</small></div><div><span className="metric-icon"><Icon name="check" size={17}/></span><strong>{members.reduce((n,m)=>n+Number(m.completed_targets||0),0)}</strong><small>{t('Target selesai','Targets completed')}</small></div></div>
- <label className="search-box member-search"><Icon name="search" size={16}/><input aria-label={t('Cari anggota','Search members')} placeholder={t('Cari nama atau email...','Search by name or email...')} value={query} onChange={e=>setQuery(e.target.value)}/></label>
- {loading?<LoadingState/>:failed?<ErrorState onRetry={()=>setAttempt(x=>x+1)}/>:!visible.length?<EmptyState icon="users" title={t('Belum ada anggota','No members yet')} description={t('Akun member yang mendaftar akan muncul di sini.','Registered member accounts will appear here.')}/>:<div className="member-grid">{visible.map(m=><article className="panel member-card" key={m.id}><div className="member-card-head"><span className="avatar">{m.name?.slice(0,1).toUpperCase()}</span><div><strong>{m.name}</strong><small>{m.email}</small></div></div><div className="member-card-stats"><div><strong>{m.active_targets}</strong><small>{t('Target aktif','Active targets')}</small></div><div><strong>{m.completed_targets}</strong><small>{t('Selesai','Completed')}</small></div><div><strong>{m.submission_count}</strong><small>{t('Dokumen','Documents')}</small></div></div><div className="member-card-foot"><span>{t('Bergabung','Joined')} {formatDate(m.created_at)}</span><Link to={`/admin/targets?create=1&member=${m.id}`}>{t('Tugaskan','Assign')} <Icon name="arrow" size={14}/></Link></div></article>)}</div>}
- </div>
+import TargetTable from '../../components/TargetTable';
+
+export default function Members() {
+  const { t } = useLanguage();
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('all');
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true); setFailed(false);
+    api.get('/targets', { signal: controller.signal }).then(({ data }) => setTasks(data))
+      .catch(() => { if (!controller.signal.aborted) setFailed(true); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [attempt]);
+
+  const visible = tasks.filter(task => (filter === 'all' || task.status === filter)
+    && `${task.title} ${task.engagement_title || task.audit_title || ''} ${task.assigned_team || task.assigned_name || ''}`.toLowerCase().includes(query.toLowerCase()));
+  const active = tasks.filter(task => task.status !== 'completed');
+  const needsReview = tasks.filter(task => task.status === 'submitted');
+  const blocked = tasks.filter(task => task.audit_status === 'Terhambat');
+
+  return <div className="workspace-page">
+    <div className="page-heading"><div><span className="eyebrow">{t('Pemantauan audit','Audit monitoring')}</span><h1>{t('Pemantauan per tugas','Task monitoring')}</h1><p>{t('Pantau progres, tenggat, status, dan tim penanggung jawab pada setiap tugas.','Track progress, deadlines, status, and assigned teams for each task.')}</p></div><Link className="btn-primary" to="/admin/targets?create=1"><Icon name="plus" size={15}/>{t('Buat tugas','Create task')}</Link></div>
+    <div className="member-summary task-monitoring-summary"><div><span className="metric-icon"><Icon name="target" size={17}/></span><strong>{tasks.length}</strong><small>{t('Semua tugas','All tasks')}</small></div><div><span className="metric-icon"><Icon name="clock" size={17}/></span><strong>{active.length}</strong><small>{t('Tugas aktif','Active tasks')}</small></div><div><span className="metric-icon"><Icon name="check" size={17}/></span><strong>{needsReview.length}</strong><small>{t('Menunggu tinjauan','Awaiting review')}</small></div><div><span className="metric-icon"><Icon name="flag" size={17}/></span><strong>{blocked.length}</strong><small>{t('Terhambat','Blocked')}</small></div></div>
+    <section className="panel"><div className="panel-header"><div><h2>{t('Daftar tugas audit','Audit task list')}</h2><p>{t(`${visible.length} tugas ditampilkan`, `${visible.length} tasks shown`)}</p></div></div><div className="table-toolbar"><label className="search-box"><Icon name="search" size={16}/><input aria-label={t('Cari tugas','Search tasks')} placeholder={t('Cari judul tugas atau tim...','Search task title or team...')} value={query} onChange={event=>setQuery(event.target.value)}/></label><select className="filter-select" value={filter} onChange={event=>setFilter(event.target.value)} aria-label={t('Filter status tugas','Filter task status')}>{[['all','Semua status','All statuses'],['assigned','Ditugaskan','Assigned'],['in_progress','Berjalan','In progress'],['submitted','Menunggu review','Awaiting review'],['revision','Perlu revisi','Needs revision'],['completed','Selesai','Completed']].map(([value,id,en])=><option key={value} value={value}>{t(id,en)}</option>)}</select></div>{loading?<LoadingState/>:failed?<div className="p-5"><ErrorState onRetry={()=>setAttempt(value=>value+1)}/></div>:<TargetTable targets={visible}/>}</section>
+  </div>;
 }

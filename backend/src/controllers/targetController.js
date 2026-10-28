@@ -2,9 +2,10 @@ const { db } = require('../config/db');
 const { normalizeFilename } = require('../utils/normalizeFilename');
 const { validDate, dateOnly, withScheduleStatus } = require('../utils/auditDates');
 const STATUSES = ['assigned', 'in_progress', 'submitted', 'completed', 'revision'];
-const AUDIT_STATUSES = ['Belum Mulai', 'Berjalan', 'Menunggu Data', 'Terhambat', 'Review Ketua Tim', 'Selesai'];
+const AUDIT_STATUSES = ['Belum Mulai', 'Berjalan', 'Menunggu Data', 'Terhambat', 'Menunggu Review', 'Selesai'];
 const SELECT_TARGET = `SELECT t.*, u.name AS assigned_name, u.email AS assigned_email, a.name AS created_by_name,
-  COALESCE(e.title, CASE WHEN t.audit_title = '' THEN NULL ELSE t.audit_title END) AS engagement_title, e.program_id
+  COALESCE(e.title, CASE WHEN t.audit_title = '' THEN NULL ELSE t.audit_title END) AS engagement_title, e.program_id,
+  COALESCE((SELECT string_agg(DISTINCT ru.name, ', ' ORDER BY ru.name) FROM target_role_assignments rta JOIN users ru ON ru.id = rta.user_id WHERE rta.target_id = t.id), u.name) AS assigned_team
   FROM targets t JOIN users u ON u.id = t.assigned_to JOIN users a ON a.id = t.created_by
   LEFT JOIN audit_engagements e ON e.id = t.engagement_id`;
 
@@ -13,11 +14,15 @@ async function getTarget(id) {
   return rows[0] ? withScheduleStatus(rows[0]) : rows[0];
 }
 function fail(res, status, code, message) { return res.status(status).json({ code, message }); }
-function canAccess(target, user) { return user.role === 'admin' || target.assigned_to === user.id; }
+async function canAccess(target, user) {
+  if (user.role === 'admin' || target.assigned_to === user.id) return true;
+  const { rows } = await db.query('SELECT 1 FROM target_role_assignments WHERE target_id = $1 AND user_id = $2 LIMIT 1', [target.id, user.id]);
+  return Boolean(rows[0]);
+}
 
 async function listTargets(req, res) {
   const where = [], params = [];
-  if (req.user.role === 'member') { params.push(req.user.id); where.push(`t.assigned_to = $${params.length}`); }
+  if (req.user.role === 'member') { params.push(req.user.id); where.push(`(t.assigned_to = $${params.length} OR EXISTS (SELECT 1 FROM target_role_assignments tra WHERE tra.target_id = t.id AND tra.user_id = $${params.length}))`); }
   else if (req.query.assigned_to) { params.push(req.query.assigned_to); where.push(`t.assigned_to = $${params.length}`); }
   if (req.query.status && req.query.status !== 'all') {
     if (!STATUSES.includes(req.query.status)) return fail(res, 400, 'INVALID_STATUS', 'Status target tidak valid.');
@@ -38,20 +43,23 @@ async function listTargets(req, res) {
 async function targetDetail(req, res) {
   const target = await getTarget(req.params.id);
   if (!target) return fail(res, 404, 'TARGET_NOT_FOUND', 'Target tidak ditemukan.');
-  if (!canAccess(target, req.user)) return fail(res, 403, 'FORBIDDEN', 'Akses ditolak.');
+  if (!await canAccess(target, req.user)) return fail(res, 403, 'FORBIDDEN', 'Akses ditolak.');
   const { rows } = await db.query(
     'SELECT id, title, file_name, status, submitted_at FROM submissions WHERE target_id = $1 ORDER BY submitted_at DESC',
     [target.id],
   );
   const submissions = rows.map(submission => ({ ...submission, file_name: normalizeFilename(submission.file_name) }));
-  const [{ rows: requests }, { rows: workLogs }, { rows: history }] = await Promise.all([
+  const [{ rows: requests }, { rows: workLogs }, { rows: history }, { rows: roles }, { rows: documents }] = await Promise.all([
     db.query('SELECT * FROM auditee_data_requests WHERE target_id = $1 ORDER BY due_date, id', [target.id]),
     db.query(`SELECT w.*, u.name AS member_name FROM target_work_logs w JOIN users u ON u.id = w.user_id
       WHERE w.target_id = $1 ORDER BY w.work_date DESC, w.id DESC`, [target.id]),
     db.query(`SELECT h.*, u.name AS member_name FROM target_progress_history h JOIN users u ON u.id = h.user_id
       WHERE h.target_id = $1 ORDER BY h.created_at DESC LIMIT 20`, [target.id]),
+    db.query(`SELECT tra.id, tra.role_name, tra.user_id, tra.work_target, tra.required_documents, tra.progress, u.name AS member_name, u.email AS member_email FROM target_role_assignments tra JOIN users u ON u.id = tra.user_id WHERE tra.target_id = $1 ORDER BY tra.id`, [target.id]),
+    db.query(`SELECT d.id, d.title, d.drive_url, d.created_at, u.name AS added_by_name FROM target_documents d JOIN users u ON u.id = d.added_by WHERE d.target_id = $1 ORDER BY d.created_at DESC`, [target.id]),
   ]);
-  res.json({ ...target, submissions, data_requests: requests, work_logs: workLogs, progress_history: history });
+  const roleAssignments = roles.length ? roles : [{ user_id: target.assigned_to, role_name: 'Pelaksana', work_target: '', required_documents: target.evidence_needed || '', progress: target.progress || 0, member_name: target.assigned_name, member_email: target.assigned_email }];
+  res.json({ ...target, role_assignments: roleAssignments, drive_documents: documents, submissions: submissions.map(item => ({ ...item, file_url: `/api/submissions/${item.id}/file`, preview_url: `/api/submissions/${item.id}/preview` })), data_requests: requests, work_logs: workLogs, progress_history: history });
 }
 
 async function createTarget(req, res) {
@@ -68,7 +76,7 @@ async function createTarget(req, res) {
   if (typeof due_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(due_date) || Number.isNaN(Date.parse(due_date)) || new Date(due_date).toISOString().slice(0, 10) !== due_date) return fail(res, 400, 'INVALID_DATE', 'Tanggal tenggat tidak valid.');
   if (start_date && (typeof start_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(start_date) || Number.isNaN(Date.parse(start_date)) || new Date(start_date).toISOString().slice(0, 10) !== start_date)) return fail(res, 400, 'INVALID_START_DATE', 'Tanggal mulai tidak valid.');
   if (start_date && start_date > due_date) return fail(res, 400, 'INVALID_DATE_RANGE', 'Tanggal mulai tidak boleh setelah tanggal target selesai.');
-  if (reviewer.length > 200 || evidenceNeeded.length > 3000) return fail(res, 400, 'INVALID_REVIEWER', 'Nama reviewer maksimal 200 karakter dan kebutuhan bukti maksimal 3000 karakter.');
+  if (reviewer.length > 200 || evidenceNeeded.length > 3000) return fail(res, 400, 'INVALID_EVIDENCE', 'Periksa panjang nama reviewer dan kebutuhan bukti.');
   const { rows: members } = await db.query("SELECT id FROM users WHERE id = $1 AND role = 'member'", [Number(assigned_to)]);
   if (!members[0]) return fail(res, 400, 'INVALID_ASSIGNEE', 'Member tidak ditemukan.');
   const engagementId = req.body.engagement_id == null || req.body.engagement_id === '' ? null : Number(req.body.engagement_id);
@@ -81,11 +89,93 @@ async function createTarget(req, res) {
     if (start_date && (start_date < engagementStart || start_date > engagementDue)) return fail(res, 400, 'OUTSIDE_ENGAGEMENT_DATES', 'Tanggal mulai target harus berada dalam rentang judul audit.');
     if (due_date < engagementStart || due_date > engagementDue) return fail(res, 400, 'OUTSIDE_ENGAGEMENT_DATES', 'Tenggat target harus berada dalam rentang judul audit.');
   }
+  const requestedRoles = Array.isArray(req.body.role_assignments) ? req.body.role_assignments : [];
+  const roleAssignments = requestedRoles.length ? requestedRoles : [{ role_name: 'Pelaksana', user_id: Number(assigned_to), work_target: '', required_documents: evidenceNeeded, progress: 0 }];
+  if (roleAssignments.length > 30 || roleAssignments.some(item => !item || typeof item.role_name !== 'string' || !item.role_name.trim() || item.role_name.trim().length > 100 || !Number.isInteger(Number(item.user_id)) || Number(item.user_id) < 1 || (item.work_target != null && (typeof item.work_target !== 'string' || item.work_target.length > 3000)) || (item.required_documents != null && (typeof item.required_documents !== 'string' || item.required_documents.length > 3000)) || (item.progress != null && (!Number.isInteger(item.progress) || item.progress < 0 || item.progress > 100)))) return fail(res, 400, 'INVALID_ROLE_ASSIGNMENTS', 'Periksa peran, target kerja, daftar dokumen, progres, dan anggota yang dipilih.');
+  for (const assignment of roleAssignments) {
+    const { rows: validMembers } = await db.query("SELECT id FROM users WHERE id = $1 AND role = 'member'", [Number(assignment.user_id)]);
+    if (!validMembers[0]) return fail(res, 400, 'INVALID_ROLE_MEMBER', 'Anggota penanggung jawab tidak ditemukan.');
+  }
   const { rows } = await db.query(
     'INSERT INTO targets (title, description, assigned_to, created_by, due_date, priority, start_date, reviewer, evidence_needed, engagement_id, audit_title) VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::date, CURRENT_DATE), $8, $9, $10, $11) RETURNING id',
     [title, description, members[0].id, req.user.id, due_date, priority, start_date || null, reviewer, evidenceNeeded, engagementId, auditTitle],
   );
+  for (const assignment of roleAssignments) await db.query('INSERT INTO target_role_assignments (target_id, role_name, user_id, work_target, required_documents, progress) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (target_id, role_name, user_id) DO UPDATE SET work_target = EXCLUDED.work_target, required_documents = EXCLUDED.required_documents, progress = EXCLUDED.progress', [rows[0].id, assignment.role_name.trim(), Number(assignment.user_id), assignment.work_target?.trim() || '', assignment.required_documents?.trim() || '', assignment.progress || 0]);
   res.status(201).json(await getTarget(rows[0].id));
+}
+
+async function setTargetRoles(req, res) {
+  const target = await getTarget(Number(req.params.id));
+  if (!target) return fail(res, 404, 'TARGET_NOT_FOUND', 'Target tidak ditemukan.');
+  const assignments = req.body.role_assignments;
+  if (!Array.isArray(assignments) || assignments.length < 1 || assignments.length > 30 || assignments.some(item => !item || typeof item.role_name !== 'string' || !item.role_name.trim() || item.role_name.trim().length > 100 || !Number.isInteger(Number(item.user_id)) || Number(item.user_id) < 1 || (item.work_target != null && (typeof item.work_target !== 'string' || item.work_target.length > 3000)) || (item.required_documents != null && (typeof item.required_documents !== 'string' || item.required_documents.length > 3000)) || (item.progress != null && (!Number.isInteger(item.progress) || item.progress < 0 || item.progress > 100)))) return fail(res, 400, 'INVALID_ROLE_ASSIGNMENTS', 'Tugas harus memiliki peran anggota dengan target kerja, dokumen, dan progres yang valid.');
+  for (const item of assignments) {
+    const { rows } = await db.query("SELECT id FROM users WHERE id = $1 AND role = 'member'", [Number(item.user_id)]);
+    if (!rows[0]) return fail(res, 400, 'INVALID_ROLE_MEMBER', 'Anggota penanggung jawab tidak ditemukan.');
+  }
+  await db.query('UPDATE targets SET assigned_to = $1 WHERE id = $2', [Number(assignments[0].user_id), target.id]);
+  await db.query('DELETE FROM target_role_assignments WHERE target_id = $1', [target.id]);
+  for (const item of assignments) await db.query('INSERT INTO target_role_assignments (target_id, role_name, user_id, work_target, required_documents, progress) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (target_id, role_name, user_id) DO UPDATE SET work_target = EXCLUDED.work_target, required_documents = EXCLUDED.required_documents, progress = EXCLUDED.progress', [target.id, item.role_name.trim(), Number(item.user_id), item.work_target?.trim() || '', item.required_documents?.trim() || '', item.progress || 0]);
+  const { rows: totals } = await db.query('SELECT ROUND(AVG(progress))::int AS overall_progress FROM target_role_assignments WHERE target_id = $1', [target.id]);
+  await db.query('UPDATE targets SET progress = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [totals[0]?.overall_progress || 0, target.id]);
+  res.json({ role_assignments: assignments, progress: Number(totals[0]?.overall_progress || 0) });
+}
+
+function normalizeDriveUrl(value) {
+  try { const url = new URL(value); return url.protocol === 'https:' && url.hostname === 'drive.google.com' && /\/folders\/[a-zA-Z0-9_-]+/.test(url.pathname) ? url.toString() : null; } catch { return null; }
+}
+async function addTargetDocument(req, res) {
+  const target = await getTarget(Number(req.params.id));
+  if (!target) return fail(res, 404, 'TARGET_NOT_FOUND', 'Target tidak ditemukan.');
+  const title = typeof req.body.title === 'string' ? req.body.title.trim() : '';
+  const url = normalizeDriveUrl(req.body.drive_url);
+  if (!title || title.length > 200 || !url) return fail(res, 400, 'INVALID_DRIVE_DOCUMENT', 'Isi nama folder dan tautan folder Google Drive yang valid.');
+  const { rows } = await db.query('INSERT INTO target_documents (target_id,title,drive_url,added_by) VALUES ($1,$2,$3,$4) RETURNING id,title,drive_url,created_at', [target.id, title, url, req.user.id]);
+  res.status(201).json(rows[0]);
+}
+async function removeTargetDocument(req, res) {
+  const { rowCount } = await db.query('DELETE FROM target_documents WHERE id = $1 AND target_id = $2', [Number(req.params.documentId), Number(req.params.id)]);
+  if (!rowCount) return fail(res, 404, 'DOCUMENT_NOT_FOUND', 'Dokumen tidak ditemukan.');
+  res.status(204).end();
+}
+function extractDriveFolderId(value) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || !['drive.google.com', 'docs.google.com'].includes(url.hostname)) return null;
+    return url.pathname.match(/\/folders\/([a-zA-Z0-9_-]+)/)?.[1] || url.searchParams.get('id');
+  } catch { return null; }
+}
+async function listTargetFolderFiles(req, res) {
+  const targetResult = await getTargetForActor(Number(req.params.id), req.user);
+  if (targetResult.error) return fail(res, targetResult.error.status, targetResult.error.code, targetResult.error.message);
+  const { rows } = await db.query('SELECT id, drive_url FROM target_documents WHERE id = $1 AND target_id = $2', [Number(req.params.documentId), targetResult.target.id]);
+  if (!rows[0]) return fail(res, 404, 'DOCUMENT_NOT_FOUND', 'Folder Drive tidak ditemukan.');
+  const folderId = extractDriveFolderId(rows[0].drive_url);
+  if (!folderId) return fail(res, 400, 'INVALID_DRIVE_FOLDER', 'Tautan Google Drive bukan tautan folder yang valid.');
+  const apiKey = process.env.GOOGLE_DRIVE_API_KEY;
+  if (!apiKey) return fail(res, 503, 'DRIVE_API_NOT_CONFIGURED', 'Daftar isi folder belum dikonfigurasi. Admin perlu menambahkan GOOGLE_DRIVE_API_KEY.');
+  const files = [];
+  let pageToken = '';
+  try {
+    do {
+      const url = new URL('https://www.googleapis.com/drive/v3/files');
+      url.searchParams.set('key', apiKey);
+      url.searchParams.set('q', `'${folderId}' in parents and trashed = false`);
+      url.searchParams.set('fields', 'nextPageToken,files(id,name,mimeType,modifiedTime,webViewLink,iconLink)');
+      url.searchParams.set('pageSize', '1000');
+      url.searchParams.set('supportsAllDrives', 'true');
+      url.searchParams.set('includeItemsFromAllDrives', 'true');
+      if (pageToken) url.searchParams.set('pageToken', pageToken);
+      const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+      const payload = await response.json();
+      if (!response.ok) return fail(res, 502, 'DRIVE_LIST_FAILED', payload.error?.message || 'Google Drive belum dapat membaca isi folder.');
+      files.push(...(payload.files || []));
+      pageToken = payload.nextPageToken || '';
+    } while (pageToken && files.length < 5000);
+  } catch (error) {
+    return fail(res, 502, 'DRIVE_UNAVAILABLE', error.name === 'TimeoutError' ? 'Permintaan ke Google Drive melewati batas waktu.' : 'Google Drive belum dapat dijangkau.');
+  }
+  res.json({ files: files.slice(0, 5000), truncated: files.length >= 5000 });
 }
 
 async function assignTargetEngagement(req, res) {
@@ -108,12 +198,24 @@ async function assignTargetEngagement(req, res) {
 async function updateProgress(req, res) {
   const target = await getTarget(req.params.id);
   if (!target) return fail(res, 404, 'TARGET_NOT_FOUND', 'Target tidak ditemukan.');
-  if (target.assigned_to !== req.user.id) return fail(res, 403, 'FORBIDDEN', 'Akses ditolak.');
+  if (!await canAccess(target, req.user)) return fail(res, 403, 'FORBIDDEN', 'Akses ditolak.');
   if (['completed', 'submitted'].includes(target.status)) return fail(res, 409, 'TARGET_LOCKED', 'Target sudah selesai atau sedang menunggu review.');
-  const { progress } = req.body;
+  const requestedProgress = req.body.progress;
   const note = typeof req.body.note === 'string' ? req.body.note.trim() : '';
-  if (!Number.isInteger(progress) || progress < 0 || progress > 100 || note.length > 4000) return fail(res, 400, 'INVALID_PROGRESS', 'Progres harus 0 sampai 100; catatan maksimal 4000 karakter.');
-  const auditStatus = progress === 100 ? 'Review Ketua Tim' : (req.body.audit_status ?? (progress > 0 ? 'Berjalan' : target.audit_status));
+  if (!Number.isInteger(requestedProgress) || requestedProgress < 0 || requestedProgress > 100 || note.length > 4000) return fail(res, 400, 'INVALID_PROGRESS', 'Progres harus 0 sampai 100; catatan maksimal 4000 karakter.');
+  const { rows: existingRoles } = await db.query('SELECT id, user_id, progress FROM target_role_assignments WHERE target_id = $1 ORDER BY id', [target.id]);
+  let progress = requestedProgress;
+  if (existingRoles.length) {
+    const roleId = Number(req.body.role_id);
+    const role = existingRoles.find(item => item.id === roleId);
+    if (!role) return fail(res, 403, 'FORBIDDEN', 'Pilih subtugas yang ditugaskan kepada Anda untuk memperbarui rincian progres.');
+    if (role.user_id !== req.user.id) return fail(res, 403, 'FORBIDDEN', 'Anda hanya dapat mengubah rincian progres pada subtugas milik Anda.');
+    const { rows: totals } = await db.query('SELECT ROUND(AVG(progress))::int AS overall_progress FROM target_role_assignments WHERE target_id = $1', [target.id]);
+    progress = Number(totals[0]?.overall_progress || 0);
+  } else if (target.assigned_to !== req.user.id) {
+    return fail(res, 403, 'FORBIDDEN', 'Anda hanya dapat mengubah progres tugas yang ditugaskan kepada Anda.');
+  }
+  const auditStatus = progress === 100 ? 'Menunggu Review' : (req.body.audit_status ?? (progress > 0 ? 'Berjalan' : target.audit_status));
   const stages = ['data_progress', 'analysis_progress', 'workpaper_progress'];
   const stageValues = stages.map(key => req.body[key] ?? target[key]);
   const textFields = ['blocker', 'blocker_impact', 'follow_up', 'evidence_needed'];
@@ -135,6 +237,28 @@ async function updateProgress(req, res) {
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
   [target.id, req.user.id, progress, auditStatus, ...stageValues, note]);
   res.json(await getTarget(target.id));
+}
+
+async function updateRoleProgress(req, res) {
+  const target = await getTarget(Number(req.params.id));
+  if (!target) return fail(res, 404, 'TARGET_NOT_FOUND', 'Target tidak ditemukan.');
+  const roleId = Number(req.params.roleId);
+  const progress = req.body.progress;
+  if (!Number.isInteger(roleId) || roleId < 1 || !Number.isInteger(progress) || progress < 0 || progress > 100) return fail(res, 400, 'INVALID_ROLE_PROGRESS', 'ID peran atau progres tidak valid.');
+  if (req.user.role !== 'admin' && ['submitted', 'completed'].includes(target.status)) return fail(res, 409, 'TARGET_LOCKED', 'Tugas sudah dikirim untuk ditinjau atau selesai.');
+  const { rows: roles } = await db.query('SELECT id, role_name, user_id FROM target_role_assignments WHERE id = $1 AND target_id = $2', [roleId, target.id]);
+  const role = roles[0];
+  if (!role) return fail(res, 404, 'ROLE_NOT_FOUND', 'Peran pada tugas ini tidak ditemukan.');
+  if (req.user.role !== 'admin' && role.user_id !== req.user.id) return fail(res, 403, 'FORBIDDEN', 'Hanya anggota yang ditugaskan pada peran ini yang dapat memperbarui progresnya.');
+  await db.query('UPDATE target_role_assignments SET progress = $1 WHERE id = $2', [progress, roleId]);
+  const { rows: totals } = await db.query('SELECT ROUND(AVG(progress))::int AS overall_progress FROM target_role_assignments WHERE target_id = $1', [target.id]);
+  const overallProgress = Number(totals[0]?.overall_progress || 0);
+  const status = overallProgress === 100 ? 'submitted' : overallProgress > 0 ? 'in_progress' : 'assigned';
+  const auditStatus = overallProgress === 100 ? 'Menunggu Review' : target.audit_status === 'Menunggu Review' ? 'Berjalan' : target.audit_status;
+  await db.query('UPDATE targets SET progress = $1, status = $2, audit_status = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4', [overallProgress, status, auditStatus, target.id]);
+  await db.query(`INSERT INTO target_progress_history (target_id, user_id, progress, audit_status, data_progress, analysis_progress, workpaper_progress, note)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, [target.id, req.user.id, overallProgress, auditStatus, target.data_progress, target.analysis_progress, target.workpaper_progress, `${role.role_name}: ${progress}%`]);
+  res.json({ role_id: roleId, role_progress: progress, progress: overallProgress, status, audit_status: auditStatus });
 }
 
 async function reviewTarget(req, res) {
@@ -167,7 +291,7 @@ async function getTargetForActor(targetId, user) {
   if (!Number.isInteger(targetId) || targetId < 1) return { error: { status: 400, code: 'INVALID_ID', message: 'ID target tidak valid.' } };
   const target = await getTarget(targetId);
   if (!target) return { error: { status: 404, code: 'TARGET_NOT_FOUND', message: 'Target tidak ditemukan.' } };
-  if (!canAccess(target, user)) return { error: { status: 403, code: 'FORBIDDEN', message: 'Akses ditolak.' } };
+  if (!await canAccess(target, user)) return { error: { status: 403, code: 'FORBIDDEN', message: 'Akses ditolak.' } };
   return { target };
 }
 
@@ -239,5 +363,6 @@ async function createWorkLog(req, res) {
 
 module.exports = {
   listTargets, targetDetail, createTarget, updateProgress, reviewTarget,
-  assignTargetEngagement, listDataRequests, createDataRequest, updateDataRequest, listWorkLogs, createWorkLog,
+  assignTargetEngagement, setTargetRoles, updateRoleProgress, addTargetDocument, removeTargetDocument, listTargetFolderFiles,
+  listDataRequests, createDataRequest, updateDataRequest, listWorkLogs, createWorkLog,
 };

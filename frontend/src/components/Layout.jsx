@@ -32,7 +32,7 @@ export default function Layout() {
     { to: base, end: true, icon: 'grid', label: t('Ringkasan', 'Overview') },
     { to: `${base}/targets`, icon: 'target', label: t('Target kerja', 'Work targets') },
     { to: `${base}/submissions`, icon: 'file', label: t('Dokumen audit', 'Audit documents') },
-    ...(admin ? [{ to: '/admin/program', icon: 'target', label: t('Program audit', 'Audit program') }, { to: '/admin/members', icon: 'users', label: t('Anggota tim', 'Team members') }] : [{ to: '/member/upload', icon: 'upload', label: t('Kirim dokumen', 'Upload document') }]),
+    ...(admin ? [{ to: '/admin/program', icon: 'target', label: t('Program audit', 'Audit program') }, { to: '/admin/members', icon: 'users', label: t('Pemantauan tugas', 'Task monitoring') }] : [{ to: '/member/upload', icon: 'upload', label: t('Kirim dokumen', 'Upload document') }]),
     { to: `${base}/coaching`, icon: 'message', label: t('Coaching', 'Coaching') },
     { to: `${base}/audit-guide`, icon: 'file', label: t('Panduan audit', 'Audit guide') },
   ];
