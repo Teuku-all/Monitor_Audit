@@ -88,7 +88,10 @@ async function downloadSubmission(req, res) {
   const safeName = normalizeFilename(submission.file_name).replace(/[\r\n"\\]/g, '_');
   const extension = normalizeFilename(submission.file_name).toLowerCase().split('.').pop();
   const previewTypes = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' };
-  if (req.preview) res.set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'self'");
+  if (req.preview) {
+    res.set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'self'");
+    res.set('X-Frame-Options', 'SAMEORIGIN');
+  }
   res.set({
     'Content-Type': req.preview ? (previewTypes[extension] || 'application/octet-stream') : (upstream.headers.get('content-type') || 'application/octet-stream'),
     'Content-Length': String(content.length),
