@@ -1,5 +1,6 @@
 import { useAuth } from '../context/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
+import BrandMark from './BrandMark';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -16,11 +17,7 @@ export default function Navbar() {
     <nav className="border-b border-white/[0.07] bg-[#052659]/90 backdrop-blur-xl sticky top-0 z-50">
       <div className="max-w-[1180px] mx-auto px-6 h-[72px] flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-[#052659] to-[#052659] rounded-[14px] flex items-center justify-center shadow-lg shadow-[#052659]/60">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
+          <BrandMark size={40} />
           <div>
             <span className="block font-semibold text-white text-[15px] tracking-tight">SIGAP</span>
             <span className="block max-w-[180px] text-[10px] leading-4 text-blue-100/75 mt-0.5">Sistem Informasi Gerak Audit Progresif</span>

@@ -1,3 +1,3 @@
 export default function BrandMark({ size = 42, className = '' }) {
-  return <img src="/audit-logo.png" width={size} height={size} alt="" aria-hidden="true" className={`brand-logo ${className}`} />;
+  return <img src="/sigap-logo.svg" width={size} height={size} alt="" aria-hidden="true" decoding="async" className={`brand-logo ${className}`} />;
 }

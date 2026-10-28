@@ -968,7 +968,7 @@ html[data-theme="dark"] .audit-stage-list>div,html[data-theme="dark"] .audit-pha
 }
 
 /* App identity and mobile navigation, aligned with the supplied sidebar reference. */
-.brand-logo{display:block;object-fit:contain;flex:0 0 auto;}
+.brand-logo{display:block;object-fit:contain;flex:0 0 auto;border-radius:22%;filter:drop-shadow(0 2px 4px rgba(15,23,42,.08));}
 .sidebar-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;}
 .sidebar-heading .brand{min-width:0;margin:4px 3px 38px;}
 .sidebar-close{display:none;}
