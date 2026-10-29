@@ -1,6 +1,8 @@
 # Dependencies and generated frontend output
 **/node_modules/
 **/dist/
+**/test-results/
+**/playwright-report/
 
 # Local environment configuration
 .env*

@@ -100,3 +100,5 @@ The target form accepts a manually typed audit title and audit objective. Select
 
 - Frontend production build: `cd frontend && npm run build`
 - Backend integration tests: `cd backend && npm test`
+- Browser workflow tests: `cd frontend`, run `npx playwright install chromium` once, then `npm run test:e2e`. The suite checks desktop and mobile task creation, member permissions, progress, documents, activity persistence, revision, and admin confirmation using synthetic API/document fixtures.
+- Backend tests run the production SQL against an isolated in-memory PostgreSQL engine (PGlite). They do not connect to Neon or upload files to external storage.

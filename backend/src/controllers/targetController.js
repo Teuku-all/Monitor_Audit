@@ -44,6 +44,10 @@ async function targetDetail(req, res) {
   const target = await getTarget(req.params.id);
   if (!target) return fail(res, 404, 'TARGET_NOT_FOUND', 'Target tidak ditemukan.');
   if (!await canAccess(target, req.user)) return fail(res, 403, 'FORBIDDEN', 'Akses ditolak.');
+  res.json(await targetDetailPayload(target));
+}
+
+async function targetDetailPayload(target) {
   const { rows } = await db.query(
     'SELECT id, title, file_name, status, submitted_at FROM submissions WHERE target_id = $1 ORDER BY submitted_at DESC',
     [target.id],
@@ -59,7 +63,13 @@ async function targetDetail(req, res) {
     db.query(`SELECT d.id, d.title, d.drive_url, d.created_at, u.name AS added_by_name FROM target_documents d JOIN users u ON u.id = d.added_by WHERE d.target_id = $1 ORDER BY d.created_at DESC`, [target.id]),
   ]);
   const roleAssignments = roles.length ? roles : [{ user_id: target.assigned_to, role_name: 'Pelaksana', work_target: '', required_documents: target.evidence_needed || '', progress: target.progress || 0, member_name: target.assigned_name, member_email: target.assigned_email }];
-  res.json({ ...target, role_assignments: roleAssignments, drive_documents: documents, submissions: submissions.map(item => ({ ...item, file_url: `/api/submissions/${item.id}/file`, preview_url: `/api/submissions/${item.id}/preview` })), data_requests: requests, work_logs: workLogs, progress_history: history });
+  return { ...target, role_assignments: roleAssignments, drive_documents: documents, submissions: submissions.map(item => ({ ...item, file_url: `/api/submissions/${item.id}/file`, preview_url: `/api/submissions/${item.id}/preview` })), data_requests: requests, work_logs: workLogs, progress_history: history };
+}
+
+function overallRoleProgress(roles) {
+  if (!roles.length) return 0;
+  if (roles.every(role => Number(role.progress) === 100)) return 100;
+  return Math.min(99, Math.round(roles.reduce((total, role) => total + Number(role.progress || 0), 0) / roles.length));
 }
 
 async function createTarget(req, res) {
@@ -107,18 +117,63 @@ async function createTarget(req, res) {
 async function setTargetRoles(req, res) {
   const target = await getTarget(Number(req.params.id));
   if (!target) return fail(res, 404, 'TARGET_NOT_FOUND', 'Target tidak ditemukan.');
+  if (target.status === 'completed') return fail(res, 409, 'TARGET_LOCKED', 'Peran pada tugas yang sudah selesai tidak dapat diubah.');
   const assignments = req.body.role_assignments;
   if (!Array.isArray(assignments) || assignments.length < 1 || assignments.length > 30 || assignments.some(item => !item || typeof item.role_name !== 'string' || !item.role_name.trim() || item.role_name.trim().length > 100 || !Number.isInteger(Number(item.user_id)) || Number(item.user_id) < 1 || (item.work_target != null && (typeof item.work_target !== 'string' || item.work_target.length > 3000)) || (item.required_documents != null && (typeof item.required_documents !== 'string' || item.required_documents.length > 3000)) || (item.progress != null && (!Number.isInteger(item.progress) || item.progress < 0 || item.progress > 100)))) return fail(res, 400, 'INVALID_ROLE_ASSIGNMENTS', 'Tugas harus memiliki peran anggota dengan target kerja, dokumen, dan progres yang valid.');
   for (const item of assignments) {
     const { rows } = await db.query("SELECT id FROM users WHERE id = $1 AND role = 'member'", [Number(item.user_id)]);
     if (!rows[0]) return fail(res, 400, 'INVALID_ROLE_MEMBER', 'Anggota penanggung jawab tidak ditemukan.');
   }
-  await db.query('UPDATE targets SET assigned_to = $1 WHERE id = $2', [Number(assignments[0].user_id), target.id]);
-  await db.query('DELETE FROM target_role_assignments WHERE target_id = $1', [target.id]);
-  for (const item of assignments) await db.query('INSERT INTO target_role_assignments (target_id, role_name, user_id, work_target, required_documents, progress) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (target_id, role_name, user_id) DO UPDATE SET work_target = EXCLUDED.work_target, required_documents = EXCLUDED.required_documents, progress = EXCLUDED.progress', [target.id, item.role_name.trim(), Number(item.user_id), item.work_target?.trim() || '', item.required_documents?.trim() || '', item.progress || 0]);
-  const { rows: totals } = await db.query('SELECT ROUND(AVG(progress))::int AS overall_progress FROM target_role_assignments WHERE target_id = $1', [target.id]);
-  await db.query('UPDATE targets SET progress = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [totals[0]?.overall_progress || 0, target.id]);
-  res.json({ role_assignments: assignments, progress: Number(totals[0]?.overall_progress || 0) });
+  const combinations = assignments.map(item => JSON.stringify([item.role_name.trim(), Number(item.user_id)]));
+  if (new Set(combinations).size !== combinations.length) return fail(res, 400, 'DUPLICATE_ROLE', 'Nama peran dan anggota yang sama tidak boleh ditambahkan dua kali.');
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: lockedTargets } = await client.query('SELECT status, audit_status FROM targets WHERE id = $1 FOR UPDATE', [target.id]);
+    if (lockedTargets[0]?.status === 'completed') {
+      await client.query('ROLLBACK');
+      return fail(res, 409, 'TARGET_LOCKED', 'Peran pada tugas yang sudah selesai tidak dapat diubah.');
+    }
+    const { rows: existingRoles } = await client.query('SELECT id, role_name, user_id, progress FROM target_role_assignments WHERE target_id = $1 ORDER BY id FOR UPDATE', [target.id]);
+    const retained = new Set();
+    const normalized = [];
+    for (const item of assignments) {
+      const roleName = item.role_name.trim();
+      const userId = Number(item.user_id);
+      const previous = item.id == null
+        ? existingRoles.find(role => role.role_name === roleName && role.user_id === userId)
+        : existingRoles.find(role => role.id === Number(item.id));
+      if ((item.id != null && (!Number.isInteger(Number(item.id)) || !previous)) || (previous && retained.has(previous.id))) {
+        await client.query('ROLLBACK');
+        return fail(res, 400, 'INVALID_ROLE_ID', 'Peran yang diubah tidak ditemukan pada tugas ini. Muat ulang halaman dan coba lagi.');
+      }
+      if (previous) retained.add(previous.id);
+      normalized.push({ ...item, id: previous?.id, role_name: roleName, user_id: userId, progress: previous?.progress ?? 0 });
+    }
+    for (const role of existingRoles) {
+      if (!retained.has(role.id)) await client.query('DELETE FROM target_role_assignments WHERE id = $1 AND target_id = $2', [role.id, target.id]);
+    }
+    for (const item of normalized) {
+      if (item.id) {
+        await client.query('UPDATE target_role_assignments SET role_name = $1, user_id = $2, work_target = $3, required_documents = $4 WHERE id = $5 AND target_id = $6', [item.role_name, item.user_id, item.work_target?.trim() || '', item.required_documents?.trim() || '', item.id, target.id]);
+      } else {
+        await client.query('INSERT INTO target_role_assignments (target_id, role_name, user_id, work_target, required_documents, progress) VALUES ($1,$2,$3,$4,$5,$6)', [target.id, item.role_name, item.user_id, item.work_target?.trim() || '', item.required_documents?.trim() || '', item.progress]);
+      }
+    }
+    const progress = overallRoleProgress(normalized);
+    const status = progress === 100 ? 'submitted' : progress > 0 ? 'in_progress' : 'assigned';
+    const currentAuditStatus = lockedTargets[0]?.audit_status || target.audit_status;
+    const auditStatus = progress === 100 ? 'Menunggu Review' : ['Menunggu Review', 'Selesai'].includes(currentAuditStatus) ? (progress > 0 ? 'Berjalan' : 'Belum Mulai') : currentAuditStatus;
+    await client.query('UPDATE targets SET assigned_to = $1, progress = $2, status = $3, audit_status = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5', [normalized[0].user_id, progress, status, auditStatus, target.id]);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error.code === '23505') return fail(res, 409, 'ROLE_CONFLICT', 'Peran dengan nama dan anggota tersebut sudah ada. Periksa kembali pembagian peran.');
+    throw error;
+  } finally {
+    client.release();
+  }
+  res.json(await targetDetailPayload(await getTarget(target.id)));
 }
 
 function normalizeDriveUrl(value) {
@@ -210,8 +265,7 @@ async function updateProgress(req, res) {
     const role = existingRoles.find(item => item.id === roleId);
     if (!role) return fail(res, 403, 'FORBIDDEN', 'Pilih subtugas yang ditugaskan kepada Anda untuk memperbarui rincian progres.');
     if (role.user_id !== req.user.id) return fail(res, 403, 'FORBIDDEN', 'Anda hanya dapat mengubah rincian progres pada subtugas milik Anda.');
-    const { rows: totals } = await db.query('SELECT ROUND(AVG(progress))::int AS overall_progress FROM target_role_assignments WHERE target_id = $1', [target.id]);
-    progress = Number(totals[0]?.overall_progress || 0);
+    progress = overallRoleProgress(existingRoles);
   } else if (target.assigned_to !== req.user.id) {
     return fail(res, 403, 'FORBIDDEN', 'Anda hanya dapat mengubah progres tugas yang ditugaskan kepada Anda.');
   }
@@ -236,7 +290,7 @@ async function updateProgress(req, res) {
     (target_id, user_id, progress, audit_status, data_progress, analysis_progress, workpaper_progress, note)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
   [target.id, req.user.id, progress, auditStatus, ...stageValues, note]);
-  res.json(await getTarget(target.id));
+  res.json(await targetDetailPayload(await getTarget(target.id)));
 }
 
 async function updateRoleProgress(req, res) {
@@ -245,14 +299,14 @@ async function updateRoleProgress(req, res) {
   const roleId = Number(req.params.roleId);
   const progress = req.body.progress;
   if (!Number.isInteger(roleId) || roleId < 1 || !Number.isInteger(progress) || progress < 0 || progress > 100) return fail(res, 400, 'INVALID_ROLE_PROGRESS', 'ID peran atau progres tidak valid.');
-  if (req.user.role !== 'admin' && ['submitted', 'completed'].includes(target.status)) return fail(res, 409, 'TARGET_LOCKED', 'Tugas sudah dikirim untuk ditinjau atau selesai.');
+  if (target.status === 'completed' || (req.user.role !== 'admin' && target.status === 'submitted')) return fail(res, 409, 'TARGET_LOCKED', 'Tugas sudah dikirim untuk ditinjau atau selesai.');
   const { rows: roles } = await db.query('SELECT id, role_name, user_id FROM target_role_assignments WHERE id = $1 AND target_id = $2', [roleId, target.id]);
   const role = roles[0];
   if (!role) return fail(res, 404, 'ROLE_NOT_FOUND', 'Peran pada tugas ini tidak ditemukan.');
   if (req.user.role !== 'admin' && role.user_id !== req.user.id) return fail(res, 403, 'FORBIDDEN', 'Hanya anggota yang ditugaskan pada peran ini yang dapat memperbarui progresnya.');
   await db.query('UPDATE target_role_assignments SET progress = $1 WHERE id = $2', [progress, roleId]);
-  const { rows: totals } = await db.query('SELECT ROUND(AVG(progress))::int AS overall_progress FROM target_role_assignments WHERE target_id = $1', [target.id]);
-  const overallProgress = Number(totals[0]?.overall_progress || 0);
+  const { rows: allRoles } = await db.query('SELECT progress FROM target_role_assignments WHERE target_id = $1', [target.id]);
+  const overallProgress = overallRoleProgress(allRoles);
   const status = overallProgress === 100 ? 'submitted' : overallProgress > 0 ? 'in_progress' : 'assigned';
   const auditStatus = overallProgress === 100 ? 'Menunggu Review' : target.audit_status === 'Menunggu Review' ? 'Berjalan' : target.audit_status;
   await db.query('UPDATE targets SET progress = $1, status = $2, audit_status = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4', [overallProgress, status, auditStatus, target.id]);
@@ -268,6 +322,10 @@ async function reviewTarget(req, res) {
   const { status } = req.body;
   const feedback = typeof req.body.feedback === 'string' ? req.body.feedback.trim() : '';
   if (!['completed', 'revision'].includes(status) || feedback.length > 4000 || (status === 'revision' && !feedback)) return fail(res, 400, 'INVALID_REVIEW', 'Pilih hasil review dan isi catatan revisi bila diperlukan.');
+  if (status === 'completed') {
+    const { rows: roles } = await db.query('SELECT progress FROM target_role_assignments WHERE target_id = $1', [target.id]);
+    if (roles.length && overallRoleProgress(roles) < 100) return fail(res, 409, 'NOT_READY_FOR_REVIEW', 'Semua peran harus mencapai progres 100% sebelum tugas dikonfirmasi selesai.');
+  }
   const quality = ['procedure_followed', 'evidence_sufficient', 'conclusion_reviewed'].map(key => req.body[`quality_${key}`]);
   const qualityNotes = typeof req.body.quality_review_notes === 'string' ? req.body.quality_review_notes.trim() : '';
   if (qualityNotes.length > 4000) return fail(res, 400, 'INVALID_QUALITY_NOTES', 'Catatan mutu maksimal 4000 karakter.');
@@ -284,7 +342,7 @@ async function reviewTarget(req, res) {
     (target_id, user_id, progress, audit_status, data_progress, analysis_progress, workpaper_progress, note)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
   [target.id, req.user.id, updatedTarget[0].progress, status === 'completed' ? 'Selesai' : 'Berjalan', updatedTarget[0].data_progress, updatedTarget[0].analysis_progress, updatedTarget[0].workpaper_progress, feedback]);
-  res.json(await getTarget(target.id));
+  res.json(await targetDetailPayload(await getTarget(target.id)));
 }
 
 async function getTargetForActor(targetId, user) {
