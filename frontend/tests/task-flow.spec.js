@@ -201,3 +201,56 @@ test('task load error can be retried and empty task list is understandable', asy
   workspace.failures.clear(); await page.getByRole('button', { name: 'Coba lagi', exact: true }).click(); await expect(page.locator('.task-role-row')).toHaveCount(2);
   workspace.empty = true; await page.goto('/member/targets'); await expect(page.getByText('Belum ada target di sini')).toBeVisible();
 });
+
+test('mobile quick navigation and drawer preserve keyboard focus', async ({ page, workspace }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'Phone navigation only');
+  await page.goto('/member/targets');
+  const quickNav = page.getByRole('navigation', { name: 'Navigasi cepat' });
+  await expect(quickNav.getByRole('link', { name: 'Tugas', exact: true })).toHaveAttribute('aria-current', 'page');
+  const more = quickNav.getByRole('button', { name: 'Buka menu lainnya' });
+  await more.click();
+  const drawer = page.getByRole('dialog', { name: 'Menu navigasi' });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByRole('button', { name: 'Tutup menu' })).toBeFocused();
+  await drawer.getByRole('button', { name: 'Keluar' }).focus();
+  await page.keyboard.press('Tab');
+  await expect(drawer.getByRole('link', { name: /SIGAP/ })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(drawer.getByRole('button', { name: 'Keluar' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(more).toBeFocused();
+  await expect(drawer).toHaveCount(0);
+  await quickNav.getByRole('link', { name: 'Dokumen', exact: true }).click();
+  await expect(page).toHaveURL(/\/member\/submissions$/);
+  await page.setViewportSize({ width: 320, height: 740 });
+  await assertNoOverflow(page);
+  await more.click();
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await expect(page.getByRole('dialog', { name: 'Menu navigasi' })).toHaveCount(0);
+  await expect(page.locator('.workspace')).not.toHaveAttribute('inert', '');
+});
+
+test('document cards keep their open action reachable on phones', async ({ page, workspace }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'Phone document cards only');
+  await page.route('**/api/submissions/mine', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(initialTarget.submissions) }));
+  await page.goto('/member/submissions');
+  const openDocument = page.getByRole('link', { name: 'Buka dokumen: Kertas kerja pengujian' });
+  await expect(openDocument).toBeVisible();
+  await openDocument.scrollIntoViewIfNeeded();
+  const rect = await openDocument.boundingBox();
+  expect(rect.height).toBeGreaterThanOrEqual(44);
+  const navRect = await page.locator('.mobile-bottom-nav').boundingBox();
+  expect(rect.y + rect.height).toBeLessThanOrEqual(navRect.y);
+  await expect(openDocument).toHaveAttribute('href', '/member/submissions/8');
+});
+
+test('task table stays within the page at phone and tablet widths', async ({ page, workspace }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Checks responsive widths in one browser');
+  workspace.actor = admin;
+  await page.goto('/admin/targets');
+  await expect(page.locator('.task-table .table-title')).toHaveText(initialTarget.title);
+  for (const width of [320, 768, 1024]) {
+    await page.setViewportSize({ width, height: 844 });
+    await assertNoOverflow(page);
+  }
+});

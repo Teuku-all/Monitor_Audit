@@ -28,7 +28,7 @@ export default function SubmissionTable({ items }) {
         {admin && <td data-label={t('Anggota', 'Member')}>{item.member_name}</td>}
         <td data-label={t('Tanggal kirim', 'Submitted')}>{formatDate(item.submitted_at)}</td>
         <td data-label={t('Status', 'Status')}><StatusBadge status={item.status} /></td>
-        <td className="table-action"><Link className="table-open" aria-label={`${t('Buka dokumen', 'Open document')}: ${item.title}`} to={`/${admin ? 'admin' : 'member'}/submissions/${item.id}`}><Icon name="arrow" size={17} /></Link></td>
+        <td className="table-action"><Link className="table-open" aria-label={`${t('Buka dokumen', 'Open document')}: ${item.title}`} to={`/${admin ? 'admin' : 'member'}/submissions/${item.id}`}><span className="table-open-label">{t('Buka dokumen', 'Open document')}</span><Icon name="arrow" size={17} /></Link></td>
       </tr>)}</tbody>
     </table>
   </div>;
